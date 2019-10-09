@@ -17,7 +17,6 @@ volatile int cnt_seg_1  = 1;
 volatile int resync1    = 0;
 volatile int cnt_seg_2  = 1;
 volatile int resync2    = 0;
-volatile int current_counter    = 0;
 
 volatile byte window2 = 0;
 volatile byte actual_state = 0;
@@ -30,7 +29,6 @@ void setup(){
 }
 
 void loop() {
-    current_counter = millis();
 }
 
 void machine_state_ISR() {
@@ -47,15 +45,28 @@ void machine_state_ISR() {
 
         case SEG_2:
             if(cnt_seg_2 < time_segment2 ) cnt_seg_2++;
-            else actual_state = SYNC;
+            else {
+                actual_state = SYNC;
+                resetStates();
+            }
             break;
 
         case WINDOW2:
             if(cnt_seg_2 < (time_segment2 - resync2)) cnt_seg_2++;
-            else actual_state = SEG_1;
+            else {
+                actual_state = SEG_1;
+                resetStates();
+            }
             break;
 
         default:
             break;
     }
+}
+
+void resetStates() {
+    cnt_seg_1  = 1;
+    resync1    = 0;
+    cnt_seg_2  = 1;
+    resync2    = 0;
 }
