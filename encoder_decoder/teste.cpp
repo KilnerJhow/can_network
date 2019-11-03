@@ -13,7 +13,7 @@ void check_error();
 
 int main() {
 
-    string a = "0100010010011111100000100000111110";
+    string a = "000010010011111100000100000111110";
     string line;
     bitset <400> buf;
 
