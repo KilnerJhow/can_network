@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "fstream": "cpp",
-        "bitset": "cpp"
+        "bitset": "cpp",
+        "ostream": "cpp"
     }
 }
