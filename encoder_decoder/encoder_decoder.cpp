@@ -72,7 +72,7 @@ int crc_index = 14;
 int first = 1;
 
 bitset <250> buf;
-bitset <110> frame;
+bitset <250> frame;
 volatile int frame_count = 0;
 // bitset <15> crc;
 
@@ -280,6 +280,7 @@ void decoder_ms() {
                 // cout << "Frame: " << frame << endl;
                 if(crc_check.any()) {
                     cout << "CRC erro!" << endl;
+                    cout << "CRC check: " << crc_check << endl;
                     exit(1);
                 } else {
                     cout << "CRC ok!" << endl;
