@@ -20,7 +20,9 @@ using namespace std;
 #define ACK 13
 // #define ACK_EXT 14
 // #define END_OF_FRAME_EXT 15
-#define INTERFRAME_SPACE 16
+#define INTERMISSION 16
+#define OVERLOAD_FRAME 17
+
 
 volatile int decoder_state = WAIT;
 
@@ -32,15 +34,14 @@ volatile int count_ctrl_base_f = 0;
 volatile int count_ctrl_base_ext = 0;
 volatile int count_data = 0;
 volatile int count_remote = 0;
-// volatile int count_data_ext = 0;
-// volatile int count_remote_ext = 0;
 volatile int count_crc = 0;
-// volatile int count_crc_ext = 0;
 volatile int count_ack = 0;
-// volatile int count_ack_ext = 0;
 volatile int count_eof = 0;
-// volatile int count_eof_ext = 0;
 volatile int count_ifs = 0;
+volatile int count_overload = 0;
+volatile int count_error = 0;
+volatile int count_error_0 = 0;
+volatile int count_end_bits = 0;
 
 
 volatile int ID_A = 0;
@@ -60,8 +61,11 @@ uint16_t crc_int = 0;
 
 volatile int err_permission = 0;
 
+volatile int need_overload_frame = 0;
+volatile int crc_err_flag = 0;
+
+
 volatile int add_to_frame = 0; //usado pra multiplicar dlc*8
-volatile int add_ext = 0; //usado pra multiplicar dlc*8 para frame ext
 
 volatile int64_t data_msg = 0;
 
@@ -281,7 +285,8 @@ void decoder_ms() {
                 if(crc_check.any()) {
                     cout << "CRC erro!" << endl;
                     cout << "CRC check: " << crc_check << endl;
-                    exit(1);
+                    crc_err_flag = 1;
+                    // exit(1);
                 } else {
                     cout << "CRC ok!" << endl;
                 }
@@ -302,12 +307,18 @@ void decoder_ms() {
             if(count_ack == 0) {
                 if(bit_atual == 0)
                     cout << "ACK OK" << endl;
-                else 
-                    cout << "ACK ERROR" << endl;
+                else {
+                    cout << "Erro de ACK!" << endl;
+                    decoder_state = ERROR;
+                }
             }
 
-            if(count_ack == 1) {
-                decoder_state = END_OF_FRAME;
+            if(count_ack == 1) {    //ack delimiter
+                if(crc_err_flag) {
+                    decoder_state = ERROR;
+                    cout << "Erro de CRC apos o ACK delimiter" << endl;
+                }
+                else decoder_state = END_OF_FRAME;
             }
 
             count_ack++;
@@ -317,14 +328,25 @@ void decoder_ms() {
             if(count_eof == 7) {
                 decoder_state = WAIT;
                 cout << "Ate EOF" << endl;
+                if(need_overload_frame) decoder_state = OVERLOAD_FRAME;
+                else decoder_state = INTERMISSION;
+                //TO-DO: Retirar isso para ir para o Intermission
                 aux = -1;
             }
-            count_eof++;
+            if(bit_atual == 1) {
+                count_eof++;
+            }
             break;
         
-        case INTERFRAME_SPACE:
+        case INTERMISSION:
+            // cout << "Intermission" << endl;
+            if(bit_atual == 0) {
+                //diz ao encoder para escrever 6 0
+                decoder_state = OVERLOAD_FRAME;
+                cout << "Entrando em um frame de overload!" << endl;
+            }
 
-            if(count_ifs == 3) {
+            if(count_ifs == 2) {
                 cout << "Interframe space" << endl;
                 aux = -1;
             }
@@ -332,10 +354,37 @@ void decoder_ms() {
 
             break;
 
+        case OVERLOAD_FRAME:
+            if(count_overload == 6) {
+                //diz ao encoder para escrever 6 bits dominantes
+            }
+
+            if(count_end_bits == 7) {   //espera ler 8 bits um do barramento
+                decoder_state = WAIT;
+                aux = -1;
+            }
+
+            if(bit_atual == 1) {
+                count_end_bits++;
+            }
+            count_overload++;
+            break;
         
         case ERROR:
             // escreve 6 bits 0 e depois 8 bits 1, não se importa com a leitura
-            aux = -1;
+            //após a transmissão de 6 bits 1 o encoder envia bits 1 e espera a leitura deles
+            if(count_error_0 == 5){
+                cout << "Bits dominantes recebidos" << endl;
+            }
+
+            if(count_error == 6) {  //após a transmissão de 1 bit recessivo, ele conta mais 7 bits recessivos
+                cout << "Bits recessivos recebidos, saindo do erro" << endl;
+                decoder_state = WAIT;
+                aux = -1;
+            }
+            if(bit_atual == 1) count_error++;
+            else count_error_0++;
+
             break;
             
     }
@@ -381,17 +430,21 @@ void check_bit_stuffing() {
         // cout << "Bit atual: " << bit_atual<< endl;
         // cout << "Bit anterior: " << bit_anterior<< endl;
         // cout << "Contador de bit igual: " << cnt_bit_igual << endl;
+    
+        if(cnt_bit_igual == 4) { //5 bits iguais vieram, o próximo é bit stuffing
+            // cnt_bit_stuffing++;
+            cout << "Esperado Bit stuff" << endl;
+            flag_bit_stuff = 1;
+        }        
+
+        if(cnt_bit_igual == 5) {
+            flag_bit_stuff = 0;
+            decoder_state = ERROR;
+            err_permission = 0;
+            cout << "Erro de bit stuff!" << endl;
+        }
     }
 
-    if(cnt_bit_igual == 4) { //5 bits iguais vieram, o próximo é bit stuffing
-        cnt_bit_stuffing++;
-        flag_bit_stuff = 1;
-    }        
-
-    if(cnt_bit_igual == 5) {
-        decoder_state = ERROR;
-        cout << "Erro!" << endl;
-    }
 
     bit_anterior = bit_atual;
 }
