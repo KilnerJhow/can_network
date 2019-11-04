@@ -22,7 +22,19 @@ using namespace std;
 #define END_OF_FRAME_EXT 15
 
 volatile int decoder_state = WAIT;
+
+
 volatile int count = 0;
+volatile int count_arbitration = 0;
+volatile int count_ctrl_f = 0;
+volatile int count_ctrl_base_f = 0;
+volatile int count_data_base = 0;
+volatile int count_remote_base = 0;
+volatile int count_crc_base = 0;
+volatile int count_ack_base = 0;
+volatile int count_eof_base = 0;
+
+
 volatile int ID_A = 0;
 volatile int ID_B = 0;
 volatile int IDE = 0;
@@ -36,7 +48,7 @@ volatile int cnt_bit_stuffing = 0;
 volatile int flag_bit_stuff = 0;
 volatile int cnt_bit_igual = 0;
 
-volatile int crc_int = 0;
+uint16_t crc_int = 0;
 
 volatile int err_permission = 0;
 
@@ -93,13 +105,20 @@ int main() {
 }
 
 void decode_message() {
-    // cout << decoder_state << " ";
-    // cout << dec << "Count: " << count << " buf: " << buf[count] << endl;
-    // cout << dec << " bit stuffing count: " << cnt_bit_stuffing << endl;
+  
     bit_atual = buf[count];
-    // cout << "Count: " << count << " state "<< decoder_state << endl;
-    decoder_ms();
+    if(!flag_bit_stuff){
+        decoder_ms();
+        // cout << buf[count];
+    } else {
+        cout << "Pulando bit: " << count << endl;
+        // for(int i = 0; i < count; i++) {
+        //     cout << buf[i];
+        // }
+        // cout << endl;
+    }
     check_bit_stuffing();
+    count++;
 }
 
 void decoder_ms() {
@@ -115,96 +134,76 @@ void decoder_ms() {
             break;
 
         case ARBITRATION:
-
-            if(count <= (11 + cnt_bit_stuffing) && !flag_bit_stuff) {
+            // cout << "Arbitration" << endl;
+            if(count_arbitration <= 10) {
                 ID_A = ID_A << 1 | (bit_atual & 1);
             }
 
-            if(count == (11 + cnt_bit_stuffing)) {
+            if(count_arbitration == 10) {
                 decoder_state = CTRL_F;
                 cout << "ID_A: 0x" << hex << ID_A << endl;
                 // cout << "COUNT: " << dec << count << endl;
             }
-
-            // if(count == (13 + cnt_bit_stuffing) && !flag_bit_stuff) {
-            //     bit_12 = bit_atual;
-            // }
-
-            // if(count == (14 + cnt_bit_stuffing) && !flag_bit_stuff) { 
-                    
-            //     cout << "ID_A: 0x" << hex << ID_A;
-            //     // cout << " RTR: " << RTR;
-            //     IDE = bit_atual;
-            //     cout << " IDE: " << IDE;
-            //     // exit(1);
-            //     if(IDE == 1) {
-            //         decoder_state = CTRL_EXTENDED_F;
-            //         SRR = bit_12;
-            //         cout << " SRR: " << SRR;
-            //     }
-            //     else {
-            //         RTR = bit_12;
-            //         cout << " RTR: " << RTR << endl;
-            //         decoder_state = CTRL_BASE_F;
-            //     }
-                
-            // } 
+            count_arbitration++;
             break;
 
         case CTRL_F:
 
-            if(count == (12 + cnt_bit_stuffing) && !flag_bit_stuff) bit_12 = bit_atual;
-            if(count == (13 + cnt_bit_stuffing) && !flag_bit_stuff) {
+            if(count_ctrl_f == 0) bit_12 = bit_atual;
+            if(count_ctrl_f == 1) {
                 IDE = bit_atual;
-                cout << "IDE: " << IDE;
+                cout << "IDE: " << IDE << endl;
                 if(IDE == 1) decoder_state = CTRL_EXTENDED_F;
                 else decoder_state = CTRL_BASE_F;
             }
+            count_ctrl_f++;
             break;
 
         case CTRL_BASE_F: 
  
-            if(count == (14 + cnt_bit_stuffing) && !flag_bit_stuff) {
+            if(count_ctrl_base_f == 0) {
                 //Lê bit r0
                 RTR = bit_12;
-                cout << " RTR: " << RTR << endl;
+                cout << "RTR: " << RTR << endl;
+                cout << "Bit reservado: " << bit_atual << endl;
                 if(RTR == 0) decoder_state = DATA_FRAME_BASE;
                 else decoder_state = REMOTE_FRAME_BASE;
             }
+            count_ctrl_base_f++;
             break;
 
         case REMOTE_FRAME_BASE:
             
-            if(count <= (18 + cnt_bit_stuffing) && !flag_bit_stuff) {
+            if(count_remote_base <= 3 ) {
                 // cout << "dlc lido no bit: " << dec << count << endl;
                 DLC = DLC << 1 | (bit_atual & 1);
-
             }
-            
-            if(count == (18 + cnt_bit_stuffing)) { //21 do remote + 12 iniciais
-                cout << "DLC: " << DLC << endl;
-                cout << "data: vazio" << endl;
+
+            if(count_remote_base == 3) { //21 do remote + 12 iniciais
+                cout << "DLC: " << DLC;
+                cout << " data: vazio" << endl;
                 // cout << " RTR: " << RTR;
                 decoder_state = CRC_BASE;
                 add_base = 0;
             }
+            count_remote_base++;
             break;
         
         case DATA_FRAME_BASE:
-            if(count <= (18 + cnt_bit_stuffing) && !flag_bit_stuff) {
+            if(count_data_base <= 3 ) {
                 // cout << "dlc lido no bit: " << dec << count << endl;
                 DLC = DLC << 1 | (bit_atual & 1);
 
             }
 
-            if(count > (18 + cnt_bit_stuffing) && count <= (18 + DLC*8 + cnt_bit_stuffing) && !flag_bit_stuff) {
+            if( (count_data_base > 3 ) && (count_data_base <= (3 + DLC*8 ))) {
                 
                 // cout << "data lido no bit: " << dec << count << endl;
                 data_msg = data_msg << 1 | (bit_atual & 1);
             }
 
             
-            if(count == (18 + DLC * 8 + cnt_bit_stuffing)) {
+            if(count_data_base == (3 + DLC * 8)) {
                 // cout << 
                 // bitset <64> dlc (data_msg);
                 // cout << "Saiu no bit: " << dec <<count << endl;
@@ -215,6 +214,7 @@ void decoder_ms() {
                 // exit(1);
                 decoder_state = CRC_BASE;            
             }
+            count_data_base++;
             break;
         
         case CTRL_EXTENDED_F:
@@ -228,10 +228,11 @@ void decoder_ms() {
                 RTR = bit_atual;
             }
 
-            if(count == 35) { // 17 do ID_B e 12 iniciais
-                bitset <18> idb(ID_B);
+            if(count == 35) { // 17 do ID_B e 14 iniciais
+                // bitset <18> idb(ID_B);
                 cout << " RTR: " << RTR << endl;
-                cout << "ID_B: " << ID_B << endl;
+                cout << "ID_B: 0x" << hex << ID_B << endl;
+                cout << dec;
                 // cout << "ID_B: " << hex <<ID_B << endl;
                 // exit(1);
                 if(RTR == 1) decoder_state = REMOTE_FRAME_EXT;
@@ -280,18 +281,22 @@ void decoder_ms() {
             break;
 
         case CRC_BASE:
-
-            if(count <= (33 + add_base + cnt_bit_stuffing) && !flag_bit_stuff) {
+            // cout << "Count: " << dec <<  count << endl;
+            if(count_crc_base <= 14) {
                 crc_int = crc_int << 1 | (bit_atual & 1);
-                
+                // bitset <15> crc(crc_int);
+                // cout << crc << endl;                
             }
+
             // cout << "depois CRC: " << crc << endl;
-            if(count == (34 + add_base + cnt_bit_stuffing)) { //conta tbm o crc delimiter
+            if(count_crc_base == 15) { //conta tbm o crc delimiter
                 bitset <15> crc(crc_int);
                 cout << "CRC: " << crc << endl;
                 decoder_state = ACK_BASE;
                 err_permission = 0;
             }
+            count_crc_base++;
+            
 
             break;
         
@@ -313,16 +318,18 @@ void decoder_ms() {
             break;
 
         case ACK_BASE:
-            if(count == (35 + add_base + cnt_bit_stuffing)) {
+            if(count_ack_base == 0) {
                 if(bit_atual == 0)
                     cout << "ACK OK" << endl;
                 else 
                     cout << "ACK ERROR" << endl;
             }
 
-            if(count == (36 + add_base + cnt_bit_stuffing)) {
+            if(count_ack_base == 1) {
                 decoder_state = END_OF_FRAME_BASE;
             }
+
+            count_ack_base++;
             break;
 
         case ACK_EXT:
@@ -343,11 +350,12 @@ void decoder_ms() {
 
 
         case END_OF_FRAME_BASE:
-            if(count == (43 + add_base + cnt_bit_stuffing)) {
+            if(count_eof_base == 7) {
                 decoder_state = WAIT;
                 cout << "Ate EOF" << endl;
                 aux = -1;
             }
+            count_eof_base++;
             break;
 
         case END_OF_FRAME_EXT:
@@ -364,14 +372,13 @@ void decoder_ms() {
             break;
             
     }
-    
-    count ++;
 }
 void check_bit_stuffing() {
 
     // cout << "cnt bit igual: " << cnt_bit_igual << endl;
 
     if(err_permission) {
+
 
         if(bit_anterior == bit_atual){
 
@@ -383,13 +390,14 @@ void check_bit_stuffing() {
             flag_bit_stuff = 0;
 
         }
+        // cout << "Bit atual: " << bit_atual<< endl;
+        // cout << "Bit anterior: " << bit_anterior<< endl;
+        // cout << "Contador de bit igual: " << cnt_bit_igual << endl;
     }
 
     if(cnt_bit_igual == 4) { //5 bits iguais vieram, o próximo é bit stuffing
         cnt_bit_stuffing++;
         flag_bit_stuff = 1;
-        // cout << "Bit stuff, count: " << count << endl;
-        // cout << "Count bit stuff: " << cnt_bit_stuffing << endl;
     }        
 
     if(cnt_bit_igual == 5) {
