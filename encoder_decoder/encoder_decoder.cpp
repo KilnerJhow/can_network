@@ -38,7 +38,7 @@ volatile int cnt_bit_igual = 0;
 
 volatile int crc_int = 0;
 
-volatile int err_permission = 1;
+volatile int err_permission = 0;
 
 volatile int add_base = 0; //usado pra multiplicar dlc*8
 volatile int add_ext = 0; //usado pra multiplicar dlc*8 para frame ext
@@ -110,6 +110,7 @@ void decoder_ms() {
             if(bit_atual == 0 && count == 0) {
                 //hard sync
                 decoder_state = ARBITRATION;
+                err_permission = 1;
             } 
             break;
 
@@ -239,10 +240,18 @@ void decoder_ms() {
             break;
         
         case REMOTE_FRAME_EXT:
-            if(count == 21) {
-                
-                decoder_state = CRC_BASE;
-                add_ext = DLC*8;
+            if(count <= (38 + cnt_bit_stuffing) && !flag_bit_stuff) {
+                // cout << "dlc lido no bit: " << dec << count << endl;
+                DLC = DLC << 1 | (bit_atual & 1);
+
+            }
+            
+            if(count == (18 + cnt_bit_stuffing)) { //21 do remote + 12 iniciais
+                cout << "DLC: " << DLC << endl;
+                cout << "data: vazio" << endl;
+                // cout << " RTR: " << RTR;
+                decoder_state = CRC_EXT;
+                add_ext = 0;
             }
             break;
         
