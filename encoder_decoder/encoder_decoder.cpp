@@ -56,13 +56,14 @@ volatile int bit_12 = 0;
 volatile int DLC = 0;
 volatile int bit_anterior = 0;
 volatile int bit_atual = 0;
-volatile int cnt_bit_stuffing = 0;
+volatile int next_bit_stuff = 0;
 volatile int flag_bit_stuff = 0;
-volatile int cnt_bit_igual = 0;
+volatile int cnt_bit_0 = 0;
+volatile int cnt_bit_1 = 0;
 
 uint16_t crc_int = 0;
 
-volatile int err_permission = 0;
+volatile int err_permission = 1;
 
 volatile int need_overload_frame = 0;
 volatile int crc_err_flag = 0;
@@ -115,7 +116,7 @@ int main() {
     }
 
     // cout << line << endl;
-
+    bit_anterior = bit_atual;
     while(aux > 0) {
         decode_message();
     }
@@ -134,11 +135,19 @@ int main() {
 void decode_message() {
   
     bit_atual = buf[count];
+    // cout << "Bit atual: " << bit_atual << endl; 
+    check_bit_stuffing();
     if(!flag_bit_stuff){
-        cout << "Bit atual: " << bit_atual << endl; 
+        // cout << " cnt igual: " << cnt_bit_igual << endl;
         decoder_ms();
     }
-    check_bit_stuffing();
+
+    if(next_bit_stuff) {
+        flag_bit_stuff = 1;
+        next_bit_stuff = 0;
+    } else {
+        flag_bit_stuff = 0;
+    }
     count++;
 }
 
@@ -196,6 +205,33 @@ void decoder_ms() {
             count_ctrl_base_f++;
             break;
 
+
+        case CTRL_EXTENDED_F:
+            
+            if(count_ctrl_base_ext <= 17) {    
+                // cout << "Bit lido: " << bit_atual << endl;
+                ID_B = ID_B << 1 | (bit_atual & 1);                
+            }
+            
+            if(count_ctrl_base_ext == 18){
+                RTR = bit_atual;
+            }
+
+            if(count_ctrl_base_ext == 20) { //2 bits reservados
+                // bitset <18> idb(ID_B);
+                SRR = bit_12;
+                cout << "SRR: " << SRR << endl;
+                cout << "RTR: " << RTR << endl;
+                cout << "ID_B: 0x" << hex << ID_B << endl;
+                cout << dec;
+                if(RTR == 1) decoder_state = REMOTE_FRAME;
+                else {
+                    decoder_state = DATA_FRAME;
+                }
+            }
+            count_ctrl_base_ext++;
+            break;
+
         case REMOTE_FRAME:
             
             if(count_remote <= 3 ) {
@@ -214,10 +250,18 @@ void decoder_ms() {
             break;
         
         case DATA_FRAME:
+            // cout << "Entrou no data frame" << endl;
             if(count_data <= 3 ) {
                 // cout << "dlc lido no bit: " << dec << count << endl;
                 DLC = DLC << 1 | (bit_atual & 1);
 
+            }
+
+            if(count_data == 3) {
+                if(DLC > 8) {
+                    cout << "DLC real: " << DLC << " ";
+                    DLC = 8;
+                }
             }
 
             if( (count_data > 3 ) && (count_data <= (3 + DLC*8 ))) {
@@ -240,33 +284,9 @@ void decoder_ms() {
                 for(int i = frame_count; i >= 0; i--) {
                     calculate_crc(i);
                 }            
-                cout << "CRC calculado: " << crc_seq << endl;
+                // cout << "CRC calculado: " << crc_seq << endl;
             }
             count_data++;
-            break;
-        
-        case CTRL_EXTENDED_F:
-            
-            if(count_ctrl_base_ext <= 17) {    
-                // cout << "Bit lido: " << bit_atual << endl;
-                ID_B = ID_B << 1 | (bit_atual & 1);                
-            }
-            
-            if(count_ctrl_base_ext == 18){
-                RTR = bit_atual;
-            }
-
-            if(count_ctrl_base_ext == 20) { //2 bits reservados
-                // bitset <18> idb(ID_B);
-                cout << " RTR: " << RTR << endl;
-                cout << "ID_B: 0x" << hex << ID_B << endl;
-                cout << dec;
-                // cout << "ID_B: " << hex <<ID_B << endl;
-                // exit(1);
-                if(RTR == 1) decoder_state = REMOTE_FRAME;
-                else decoder_state = DATA_FRAME;
-            }
-            count_ctrl_base_ext++;
             break;
 
         case CRC:
@@ -294,6 +314,7 @@ void decoder_ms() {
                 } else {
                     cout << "CRC ok!" << endl;
                 }
+                err_permission = 0;
             }
 
             // cout << "depois CRC: " << crc << endl;
@@ -303,7 +324,7 @@ void decoder_ms() {
                     decoder_state = ERROR;
                 } else {
                     decoder_state = ACK;
-                    err_permission = 0;
+                    
                 }
             }
             count_crc++;
@@ -337,7 +358,7 @@ void decoder_ms() {
 
         case END_OF_FRAME:
 
-            if(count_eof == 7) {
+            if(count_eof == 6) {
                 decoder_state = BUS_IDLE;
                 cout << "Ate EOF" << endl;
                 if(need_overload_frame) decoder_state = OVERLOAD_FRAME;
@@ -455,40 +476,41 @@ void check_crc(int i) {
 }
 
 void check_bit_stuffing() {
-
-    // cout << "cnt bit igual: " << cnt_bit_igual << endl;
-
+   
     if(err_permission) {
+        if(bit_atual == 1) {
+            cnt_bit_1++;
 
+            if(cnt_bit_1 == 5) {
+                next_bit_stuff = 1;
+            }
 
-        if(bit_anterior == bit_atual){
-
-            cnt_bit_igual++; 
+            if(cnt_bit_1 == 6) {
+                cout << "Erro bit stuff na pos: " << count + 1 << endl;
+                decoder_state = ERROR;
+                err_permission = 0;
+            }
 
         } else {
-
-            cnt_bit_igual = 0;
-            flag_bit_stuff = 0;
-
+            cnt_bit_1 = 0;
         }
-        // cout << "Bit atual: " << bit_atual<< endl;
-        // cout << "Bit anterior: " << bit_anterior<< endl;
-        // cout << "Contador de bit igual: " << cnt_bit_igual << endl;
-    
-        if(cnt_bit_igual == 4) { //5 bits iguais vieram, o próximo é bit stuffing
-            // cnt_bit_stuffing++;
-            cout << "Esperado Bit stuff" << endl;
-            flag_bit_stuff = 1;
-        }        
 
-        if(cnt_bit_igual == 5) {
-            flag_bit_stuff = 0;
-            decoder_state = ERROR;
-            err_permission = 0;
-            cout << "Erro de bit stuff!" << endl;
+        if(bit_atual == 0) {
+            cnt_bit_0++;
+
+            if(cnt_bit_0 == 5) {
+                next_bit_stuff = 1;
+            }
+
+            if(cnt_bit_0 == 6) {
+                cout << "Erro bit stuff na pos: " << count + 1 << endl;
+
+                decoder_state = ERROR;
+                err_permission = 0;
+            }
+
+        } else {
+            cnt_bit_0 = 0;
         }
     }
-
-
-    bit_anterior = bit_atual;
 }
