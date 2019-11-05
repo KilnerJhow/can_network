@@ -22,9 +22,10 @@ using namespace std;
 // #define END_OF_FRAME_EXT 15
 #define INTERMISSION 16
 #define OVERLOAD_FRAME 17
+#define BUS_IDLE 18
 
 
-volatile int decoder_state = WAIT;
+volatile int decoder_state = BUS_IDLE;
 
 
 volatile int count = 0;
@@ -38,10 +39,12 @@ volatile int count_crc = 0;
 volatile int count_ack = 0;
 volatile int count_eof = 0;
 volatile int count_ifs = 0;
-volatile int count_overload = 0;
-volatile int count_error = 0;
+volatile int count_overload_0 = 0;
+volatile int count_overload_1 = 0;
+volatile int count_error_1 = 0;
 volatile int count_error_0 = 0;
 volatile int count_end_bits = 0;
+volatile int count_bus_idle = 0;
 
 
 volatile int ID_A = 0;
@@ -132,6 +135,7 @@ void decode_message() {
   
     bit_atual = buf[count];
     if(!flag_bit_stuff){
+        cout << "Bit atual: " << bit_atual << endl; 
         decoder_ms();
     }
     check_bit_stuffing();
@@ -145,7 +149,7 @@ void decoder_ms() {
     // cout << frame << endl;
     switch(decoder_state) {
 
-        case WAIT:
+        case BUS_IDLE:
             if(bit_atual == 0 && count == 0) {
                 //hard sync
                 decoder_state = ARBITRATION;
@@ -294,9 +298,13 @@ void decoder_ms() {
 
             // cout << "depois CRC: " << crc << endl;
             if(count_crc == 15) { //conta tbm o crc delimiter
-                
-                decoder_state = ACK;
-                err_permission = 0;
+                if(bit_atual == 0) {
+                    cout << "Erro de CRC delimiter!" << endl;
+                    decoder_state = ERROR;
+                } else {
+                    decoder_state = ACK;
+                    err_permission = 0;
+                }
             }
             count_crc++;
             
@@ -317,6 +325,9 @@ void decoder_ms() {
                 if(crc_err_flag) {
                     decoder_state = ERROR;
                     cout << "Erro de CRC apos o ACK delimiter" << endl;
+                } else if(bit_atual == 0) {
+                    cout << "Erro de forma no ACK delimiter!" << endl;
+                    decoder_state = ERROR;
                 }
                 else decoder_state = END_OF_FRAME;
             }
@@ -325,49 +336,60 @@ void decoder_ms() {
             break;
 
         case END_OF_FRAME:
+
             if(count_eof == 7) {
-                decoder_state = WAIT;
+                decoder_state = BUS_IDLE;
                 cout << "Ate EOF" << endl;
                 if(need_overload_frame) decoder_state = OVERLOAD_FRAME;
                 else decoder_state = INTERMISSION;
                 //TO-DO: Retirar isso para ir para o Intermission
                 aux = -1;
             }
-            if(bit_atual == 1) {
-                count_eof++;
+            if(bit_atual == 0) {
+                decoder_state = ERROR;
+                cout << "Erro de forma no EOF!" << endl;
             }
+            count_eof++;
+            
             break;
         
         case INTERMISSION:
             // cout << "Intermission" << endl;
+
+            if(count_ifs == 2) {
+                cout << "Interframe space" << endl;
+                decoder_state = BUS_IDLE;
+                aux = -1;
+            }
+
             if(bit_atual == 0) {
                 //diz ao encoder para escrever 6 0
                 decoder_state = OVERLOAD_FRAME;
                 cout << "Entrando em um frame de overload!" << endl;
+            } else { 
+                count_ifs++;
             }
-
-            if(count_ifs == 2) {
-                cout << "Interframe space" << endl;
-                aux = -1;
-            }
-            count_ifs++;
 
             break;
 
         case OVERLOAD_FRAME:
-            if(count_overload == 6) {
+            if(count_overload_0 == 4) {
+                cout << "Bits dominantes de overload recebidos" << endl;
                 //diz ao encoder para escrever 6 bits dominantes
             }
 
-            if(count_end_bits == 7) {   //espera ler 8 bits um do barramento
+            if(count_overload_1 == 7) {   //espera ler 8 bits um do barramento
                 decoder_state = WAIT;
-                aux = -1;
+                cout << "Bits recessivos de overload recebidos" << endl;
+
+                // aux = -1;
             }
 
             if(bit_atual == 1) {
-                count_end_bits++;
+                count_overload_1++;
+            } else {
+                count_overload_0++;
             }
-            count_overload++;
             break;
         
         case ERROR:
@@ -377,13 +399,35 @@ void decoder_ms() {
                 cout << "Bits dominantes recebidos" << endl;
             }
 
-            if(count_error == 6) {  //após a transmissão de 1 bit recessivo, ele conta mais 7 bits recessivos
+            if(count_error_1 == 7) {  //após a transmissão de 1 bit recessivo, ele conta mais 7 bits recessivos
                 cout << "Bits recessivos recebidos, saindo do erro" << endl;
-                decoder_state = WAIT;
-                aux = -1;
+                decoder_state = WAIT;   //após o frame de erro, pode vir frames de overload
+                // aux = -1;
             }
-            if(bit_atual == 1) count_error++;
+            if(bit_atual == 1) count_error_1++;
             else count_error_0++;
+
+            break;
+
+        case WAIT:
+            //precisamos esperar 11 bits recessivos para saber que o barramento está em idle 
+            //Esse estado sempre vem do erro ou do overload, logo 8 bits recessivos foram contados anteriormente
+            //Precisamos contar apenas mais 3 bits recessivos para o barramento ficar em idle
+            //Caso percebamos um bit 0 após os 8 bits recessivos, isso significa que é um overload frame
+            if(count_bus_idle == 10) {
+                decoder_state = BUS_IDLE;
+                aux = -1; 
+                cout << "Bus idle" << endl;
+            }
+
+            if(bit_atual == 1) {
+                count_bus_idle++;
+            } else {
+                decoder_state = OVERLOAD_FRAME;
+                cout << "Entrando em um frame de overload a partir do wait!" << endl;
+            }
+            
+            if(bit_atual == 0) decoder_state = OVERLOAD_FRAME; 
 
             break;
             
