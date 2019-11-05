@@ -1,6 +1,8 @@
 #include <iostream>
 #include <bitset>
 #include <sstream>
+#include <fstream>
+#include <string>
 
 using namespace std;
 
@@ -29,39 +31,91 @@ void check_bit_stuffing();
 
 int main() {
 
-    string a = "0000010000011111000001000001000001000001001111101111101111101111101111101111101111101111101111101111101111101111101111101110101100001011111011111111";
+    // string a = "0000010000011111000001000001000001000001001111101111101111101111101111101111101111101111101111101111101111101111101111101110101100001011111011111111";
     string line;
-    
+    string id_a, id_b, rtr, ide, dlc, data;
+    int dlc_int = 0;
+    ifstream inFile;
+    stringstream toHex;
+    uint64_t data_msg;
+    inFile.open("teste.txt");
+    getline(inFile, line);
 
-    bitset <148> buf;
-    bitset <126> frame;
+    cout << line << endl;
 
-    for(int i = 0; i < a.size(); i++){
-        buf[i] = (int)a.at(i) - '0';
-        bit_atual = buf[i];
-        check_bit_stuffing();
-        if(!flag_bit_stuff){
-            frame = frame << 1; 
-            frame[0] = bit_atual & 1;
-        } else {
-            cnt_bit_stuff++;
-        }
+    size_t pos = line.find("ID_A = ");
+    // size_t inc = 0;
+    string a = "ID_A = ";
+    id_a = line.substr(pos + a.size(),3);
 
-        if(next_bit_stuff) {
-            flag_bit_stuff = 1;
-            next_bit_stuff = 0;
-        }
-        else {
-            flag_bit_stuff = 0;
-        }
-        // calculate_crc(i);
-        // check_crc(i);
-    }
+    a = "ID_B = ";
+    pos = line.find("ID_B = ");
+    cout << "Pos id b: " << pos << endl;
+    if(pos != string::npos) id_b = line.substr(pos + a.size(), 4);
+    else id_b = "None";
 
-    // cout << "CRC: " << crc_check;
-    cout << frame << endl;
-    cout << buf << endl;
-    cout << cnt_bit_stuff << endl;
+    // inc = a.size();
+
+    pos = line.find("RTR = ");
+    a = "RTR = ";
+    rtr = line.substr(pos + a.size(), 1);
+
+    pos = line.find("IDE = ");
+    a = "IDE = ";
+    ide = line.substr(pos + a.size(), 1);
+
+    pos = line.find("DLC = ");
+    a = "DLC = ";
+    dlc = line.substr(pos + a.size(), 1);
+
+    dlc_int = (int) dlc[0] - '0';
+    dlc_int = dlc_int * 2;
+
+
+    pos = line.find("DATA = ");
+    a = "DATA = ";
+    data = line.substr(pos + a.size(), dlc_int);
+
+    toHex << data;
+    toHex >> hex >> data_msg;
+
+    cout << "ID_A: " << id_a << endl;
+    cout << "ID_B: " << id_b << endl;
+    cout << "RTR: " << rtr << endl;
+    cout << "IDE: " << ide << endl;
+    cout << "DLC: " << dlc << endl;
+    cout << "Data: " << data << endl;
+    cout << "Data inteiro: " << data_msg << endl;
+
+    // bitset <148> buf;
+    // bitset <126> frame;
+
+    // for(int i = 0; i < a.size(); i++){
+    //     buf[i] = (int)a.at(i) - '0';
+    //     bit_atual = buf[i];
+    //     check_bit_stuffing();
+    //     if(!flag_bit_stuff){
+    //         frame = frame << 1; 
+    //         frame[0] = bit_atual & 1;
+    //     } else {
+    //         cnt_bit_stuff++;
+    //     }
+
+    //     if(next_bit_stuff) {
+    //         flag_bit_stuff = 1;
+    //         next_bit_stuff = 0;
+    //     }
+    //     else {
+    //         flag_bit_stuff = 0;
+    //     }
+    //     // calculate_crc(i);
+    //     // check_crc(i);
+    // }
+
+    // // cout << "CRC: " << crc_check;
+    // cout << frame << endl;
+    // cout << buf << endl;
+    // cout << cnt_bit_stuff << endl;
 
     // unsigned long int b = 0;
 

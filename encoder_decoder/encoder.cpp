@@ -77,22 +77,22 @@ void encoder_mws(){
 			break;
 		
 		case ID:
-			for(i=0;i<11;i++){
-			enc_frame[i+enc_cnt]=buf_id[i];
+			for(i = 0; i < 11; i++){
+				enc_frame[i+enc_cnt]=buf_id[i];
 			}
 			enc_cnt=enc_cnt+12;    //11 do ID + 1
-			if(ide=1){
+			if(ide = 1){
 				enc_frame[enc_cnt]=1;//seting SRR
 				enc_cnt++;
 				enc_state=IDE;
-			}else{
+			} else {
 				enc_state=RTR;
 			}
 			break;
 		
 		case ID2:
-			for(i=0;i<18;i++){
-			enc_frame[i+enc_cnt]=buf_id[i];
+			for(i = 0; i < 18; i++){
+				enc_frame[i + enc_cnt] = buf_id[i];
 			}
 			enc_cnt=enc_cnt+19;    //18 do ID + 1
 			enc_state=RTR;
@@ -132,7 +132,7 @@ void encoder_mws(){
 				enc_cnt++;
 			}
 			for(i=0;i<4;i++){
-			enc_frame[i+enc_cnt]=buf_dlc[i]; //grava o dlc em binário
+			enc_frame[i+enc_cnt]=buf_dlc[i]; //grava o dlc em binï¿½rio
 			}
 			enc_cnt=enc_cnt+4;				//4 do DLC + 1
 			enc_state=DATA;
