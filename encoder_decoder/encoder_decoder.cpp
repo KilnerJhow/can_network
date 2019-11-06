@@ -9,20 +9,15 @@ using namespace std;
 #define CTRL_EXTENDED_F 2
 #define DATA_FRAME 3
 #define REMOTE_FRAME 4
-// #define DATA_FRAME_EXT 5
-// #define REMOTE_FRAME_EXT 6
-#define CRC 7
-#define END_OF_FRAME 8
-#define ERROR 9
-#define CTRL_BASE_F 10
-#define CTRL_F 11
-// #define CRC_EXT 12
-#define ACK 13
-// #define ACK_EXT 14
-// #define END_OF_FRAME_EXT 15
-#define INTERMISSION 16
-#define OVERLOAD_FRAME 17
-#define BUS_IDLE 18
+#define CRC 5
+#define END_OF_FRAME 6
+#define ERROR 7
+#define CTRL_BASE_F 8
+#define CTRL_F 9
+#define ACK 10
+#define INTERMISSION 11
+#define OVERLOAD_FRAME 12
+#define BUS_IDLE 13
 
 
 volatile int decoder_state = BUS_IDLE;
@@ -68,16 +63,11 @@ volatile int err_permission = 1;
 volatile int need_overload_frame = 0;
 volatile int crc_err_flag = 0;
 
-
-volatile int add_to_frame = 0; //usado pra multiplicar dlc*8
-
 volatile int64_t data_msg = 0;
 
 volatile int aux = 1;
 
 int crc_index = 14;
-
-int first = 1;
 
 bitset <250> buf;
 bitset <250> frame;
@@ -88,7 +78,7 @@ volatile int frame_count = 0;
 const uint16_t crc_polinomial = 0x4599;
 bitset <15> crc_seq;
 bitset <15> crc_check;
-uint16_t crc_convert;
+uint16_t crc_convert = 0;
 int crc_next = 0;
 
 
@@ -97,6 +87,7 @@ void check_crc(int);
 void decode_message();
 void decoder_ms();
 void check_bit_stuffing();
+void resetStates();
 
 int main() {
     string line;
@@ -112,29 +103,19 @@ int main() {
     getline(inFile, line);
 
     for(int i = 0; i < line.size(); i++){
-        buf[i] = (int)line.at(i) - '0';
-    }
-
-    // cout << line << endl;
-    bit_anterior = bit_atual;
-    while(aux > 0) {
+        // buf[i] = (int)line.at(i) - '0';
+        bit_atual = ((int)line.at(i) - '0') & 1;
+        // cout << "Bit atual: " << bit_atual << "   " << endl;
         decode_message();
     }
 
-    // while(getline(inFile, line)){
-    //     cout << line << endl;
-    //     for(int i = 0; i < line.size(); i++){
-    //         buf[i] = (int)line.at(i) - '0';
-    //     }
-    //     decode_message();
-    // }
 
     inFile.close();
 }
 
 void decode_message() {
   
-    bit_atual = buf[count];
+    // bit_atual = buf[count];
     // cout << "Bit atual: " << bit_atual << endl; 
     check_bit_stuffing();
     if(!flag_bit_stuff){
@@ -148,7 +129,8 @@ void decode_message() {
     } else {
         flag_bit_stuff = 0;
     }
-    count++;
+
+    if(decoder_state != BUS_IDLE) count++;
 }
 
 void decoder_ms() {
@@ -159,7 +141,10 @@ void decoder_ms() {
     switch(decoder_state) {
 
         case BUS_IDLE:
+            // cout << "Barramento livre count: " << count << endl;
             if(bit_atual == 0 && count == 0) {
+                cout << "SOF recebido" << endl;
+                // frame.reset();
                 //hard sync
                 decoder_state = ARBITRATION;
                 err_permission = 1;
@@ -174,7 +159,8 @@ void decoder_ms() {
 
             if(count_arbitration == 10) {
                 decoder_state = CTRL_F;
-                cout << "ID_A: 0x" << hex << ID_A << endl;
+                cout << "ID_A: 0x" << uppercase << hex << ID_A;
+                cout << dec;
                 // cout << "COUNT: " << dec << count << endl;
             }
             count_arbitration++;
@@ -185,7 +171,6 @@ void decoder_ms() {
             if(count_ctrl_f == 0) bit_12 = bit_atual;
             if(count_ctrl_f == 1) {
                 IDE = bit_atual;
-                cout << "IDE: " << IDE << endl;
                 if(IDE == 1) decoder_state = CTRL_EXTENDED_F;
                 else decoder_state = CTRL_BASE_F;
             }
@@ -197,8 +182,9 @@ void decoder_ms() {
             if(count_ctrl_base_f == 0) {
                 //Lê bit r0
                 RTR = bit_12;
-                cout << "RTR: " << RTR << endl;
-                cout << "Bit reservado: " << bit_atual << endl;
+                cout << " - RTR: " << RTR;
+                cout << " - IDE: " << IDE;
+                // cout << "Bit reservado: " << bit_atual << endl;
                 if(RTR == 0) decoder_state = DATA_FRAME;
                 else decoder_state = REMOTE_FRAME;
             }
@@ -220,9 +206,9 @@ void decoder_ms() {
             if(count_ctrl_base_ext == 20) { //2 bits reservados
                 // bitset <18> idb(ID_B);
                 SRR = bit_12;
-                cout << "SRR: " << SRR << endl;
-                cout << "RTR: " << RTR << endl;
-                cout << "ID_B: 0x" << hex << ID_B << endl;
+                cout << " - SRR: " << SRR;
+                cout << " - RTR: " << RTR;
+                cout << " - ID_B: 0x" << uppercase << hex << ID_B;
                 cout << dec;
                 if(RTR == 1) decoder_state = REMOTE_FRAME;
                 else {
@@ -240,11 +226,10 @@ void decoder_ms() {
             }
 
             if(count_remote == 3) { //21 do remote + 12 iniciais
-                cout << "DLC: " << DLC;
-                cout << " data: vazio" << endl;
+                cout << " - DLC: " << DLC;
+                cout << " - data: vazio";
                 // cout << " RTR: " << RTR;
                 decoder_state = CRC;
-                add_to_frame = 0;
             }
             count_remote++;
             break;
@@ -275,9 +260,8 @@ void decoder_ms() {
                 // cout << 
                 // bitset <64> dlc (data_msg);
                 // cout << "Saiu no bit: " << dec <<count << endl;
-                cout << "DLC: " << DLC;
-                cout << " data: " << hex << uppercase << data_msg << endl;
-                add_to_frame = DLC*8;   
+                cout << " - DLC: " << DLC;
+                cout << " - data: " << hex << uppercase << data_msg;
                 // cout << dlc << endl;
                 // exit(1);
                 decoder_state = CRC;
@@ -290,11 +274,8 @@ void decoder_ms() {
             break;
 
         case CRC:
-            // cout << "Count: " << dec <<  count << endl;
             if(count_crc <= 14) {
-                crc_int = crc_int << 1 | (bit_atual & 1);
-                // bitset <15> crc(crc_int);
-                // cout << crc << endl;                
+                crc_int = crc_int << 1 | (bit_atual & 1);             
             }
 
             if(count_crc == 14) {
@@ -303,17 +284,18 @@ void decoder_ms() {
                     check_crc(i);
                 }
                 bitset <15> crc(crc_int);
-                cout << "CRC lido: " << crc << endl;
+                // cout << "CRC lido: " << crc << endl;
                 // cout << "CRC check: " << crc_check << endl;
                 // cout << "Frame: " << frame << endl;
+                // cout << "Frame count: " << frame_count << endl;
                 if(crc_check.any()) {
                     cout << "CRC erro!" << endl;
                     cout << "CRC check: " << crc_check << endl;
                     crc_err_flag = 1;
                     // exit(1);
-                } else {
+                } /*else {
                     cout << "CRC ok!" << endl;
-                }
+                }*/
                 err_permission = 0;
             }
 
@@ -323,6 +305,7 @@ void decoder_ms() {
                     cout << "Erro de CRC delimiter!" << endl;
                     decoder_state = ERROR;
                 } else {
+                    // cout << "CRC delimiter ok" << endl;
                     decoder_state = ACK;
                     
                 }
@@ -335,7 +318,7 @@ void decoder_ms() {
         case ACK:
             if(count_ack == 0) {
                 if(bit_atual == 0)
-                    cout << "ACK OK" << endl;
+                    cout << " - ACK OK" << endl;
                 else {
                     cout << "Erro de ACK!" << endl;
                     decoder_state = ERROR;
@@ -350,7 +333,10 @@ void decoder_ms() {
                     cout << "Erro de forma no ACK delimiter!" << endl;
                     decoder_state = ERROR;
                 }
-                else decoder_state = END_OF_FRAME;
+                else {
+                    decoder_state = END_OF_FRAME;
+                    // cout << "ACK delimiter ok" << endl;
+                }
             }
 
             count_ack++;
@@ -359,10 +345,11 @@ void decoder_ms() {
         case END_OF_FRAME:
 
             if(count_eof == 6) {
-                decoder_state = BUS_IDLE;
-                cout << "Ate EOF" << endl;
+                // cout << "Ate EOF" << endl;
                 if(need_overload_frame) decoder_state = OVERLOAD_FRAME;
-                else decoder_state = INTERMISSION;
+                else {
+                    decoder_state = INTERMISSION;
+                }
                 //TO-DO: Retirar isso para ir para o Intermission
                 aux = -1;
             }
@@ -376,20 +363,20 @@ void decoder_ms() {
         
         case INTERMISSION:
             // cout << "Intermission" << endl;
-
-            if(count_ifs == 2) {
-                cout << "Interframe space" << endl;
-                decoder_state = BUS_IDLE;
-                aux = -1;
-            }
-
-            if(bit_atual == 0) {
+            if(bit_atual == 0 && count_ifs <= 1) {
                 //diz ao encoder para escrever 6 0
                 decoder_state = OVERLOAD_FRAME;
-                cout << "Entrando em um frame de overload!" << endl;
-            } else { 
-                count_ifs++;
+                cout << "Entrando em um frame de overload de intermission!" << endl;
+                // cout << "count ifs: " << count_ifs << endl;
             }
+
+            if(count_ifs == 2) {
+                // cout << "Interframe space count: " << count_ifs << endl;
+                decoder_state = BUS_IDLE;
+                resetStates();
+                cout << endl;
+                // aux = -1;
+            } else count_ifs++;
 
             break;
 
@@ -437,6 +424,7 @@ void decoder_ms() {
             //Caso percebamos um bit 0 após os 8 bits recessivos, isso significa que é um overload frame
             if(count_bus_idle == 10) {
                 decoder_state = BUS_IDLE;
+                resetStates();
                 aux = -1; 
                 cout << "Bus idle" << endl;
             }
@@ -513,4 +501,54 @@ void check_bit_stuffing() {
             cnt_bit_0 = 0;
         }
     }
+}
+
+void resetStates() {
+
+    count = 0;
+    count_arbitration = 0;
+    count_ctrl_f = 0;
+    count_ctrl_base_f = 0;
+    count_ctrl_base_ext = 0;
+    count_data = 0;
+    count_remote = 0;
+    count_crc = 0;
+    count_ack = 0;
+    count_eof = 0;
+    count_ifs = 0;
+    count_overload_0 = 0;
+    count_overload_1 = 0;
+    count_error_1 = 0;
+    count_error_0 = 0;
+    count_end_bits = 0;
+    count_bus_idle = 0;
+
+    ID_A = 0;
+    ID_B = 0;
+    IDE = 0;
+    RTR = 0;
+    SRR = 0;
+    bit_12 = 0;
+    DLC = 0;
+    bit_anterior = 0;
+    bit_atual = 0;
+    next_bit_stuff = 0;
+    flag_bit_stuff = 0;
+    cnt_bit_0 = 0;
+    cnt_bit_1 = 0;
+
+    data_msg = 0;
+
+    err_permission = 0;
+
+    need_overload_frame = 0;
+    crc_err_flag = 0;
+
+    frame.reset();
+    frame_count = 0;
+
+    crc_seq.reset();
+    crc_check.reset();
+
+    // cout << "Estados resetados!" << endl;
 }
