@@ -12,14 +12,17 @@ using namespace std;
 #define ID2 3
 #define RTR 4
 #define IDE 5
-#define CONTROL 6 
-#define DATA 7
-#define CRC 8
-#define ACK 9
-#define END 10
+#define CONTROL_RESBIT 6
+#define CONTROL 7
+#define DATA 8
+#define CRC 9
+#define CRC_D 10
+#define ACK 11
+#define END 12
 
 volatile int  enc_state = SOF;
 volatile int enc_cnt=0;
+volatile int encstuff_cnt=0;
 volatile int save_enc_cnt=0;
 volatile int i=0;
 volatile int rtr;
@@ -28,9 +31,14 @@ volatile int dlc;
 volatile int actual_bit;
 volatile int past_bit;
 volatile int cnt_stuff=0;
-
+volatile int cnt_bit_1=0;
+volatile int cnt_bit_0=0;
+volatile int bit_atual=0;
+volatile int save_encstuff_cnt=0;
+volatile int frame_build=0;
 
 bitset <250>enc_frame;
+bitset <250>enc_stuffframe;
 bitset <250> buf_msg2send;
 bitset <11> buf_id;
 bitset <18> buf_id2;
@@ -42,7 +50,7 @@ bitset <64> buf_data;
 void readNstore();
 void encoder_mws();
 void snd_msg();
-
+void bit_stuf();
 int main() {
 	
 	readNstore();
@@ -100,6 +108,7 @@ void readNstore(){
 
     toHex << data;
     toHex >> hex >> data_msg;
+	
 
     cout << "ID_A: " << id_a << endl;
     cout << "ID_B: " << id_b << endl;
@@ -112,114 +121,194 @@ void readNstore(){
 }
 
 void encoder_mws(){
-	switch(enc_state){
-		
-		case SOF:
-			enc_frame[enc_cnt]=0;
-			enc_cnt++;
-			enc_state=ID;
-			break;
-		
-		case ID:
-			for(i=0;i<11;i++){
-			enc_frame[i+enc_cnt]=buf_id[i];
-			}
-			enc_cnt=enc_cnt+12;    //11 do ID + 1
-			if(ide=1){
-				enc_frame[enc_cnt]=1;//seting SRR
-				enc_cnt++;
-				enc_state=IDE;
-			}else{
-				enc_state=RTR;
-			}
-			break;
-		
-		case ID2:
-			for(i=0;i<18;i++){
-			enc_frame[i+enc_cnt]=buf_id2[i];
-			}
-			enc_cnt=enc_cnt+19;    //18 do ID + 1
-			enc_state=RTR;
-			break;
-		
-		case RTR:
-			if(rtr==0){
+	while(frame_build=0){
+		bit_stuf();
+		switch(enc_state){
+			
+			case SOF:
 				enc_frame[enc_cnt]=0;
-			}else{
-				enc_frame[enc_cnt]=1;
-			}
-			enc_cnt++;
-			if(ide==0){
-				enc_state=IDE;
-				}else{
-				enc_state=CONTROL;	
-				}
-			break;
-		
-		case IDE:
-			enc_frame[enc_cnt]=ide;						//grava o IDE
-			enc_cnt++;
-			if(ide==0){
-				enc_state=CONTROL;
-				}else{
-				enc_state=ID2;	
-				}
-		
-		case CONTROL:
-			if(ide=0){
-				enc_frame[enc_cnt]=1;		//caso normal 1 bits reservado
 				enc_cnt++;
-			}else{							//caso extendido 2 bits reservados
-				enc_frame[enc_cnt]=1;
-				enc_cnt++;
-				enc_frame[enc_cnt]=1;
-				enc_cnt++;
-			}
-			for(i=0;i<4;i++){
-			enc_frame[i+enc_cnt]=buf_dlc[i]; //grava o dlc em binário
-			}
-			enc_cnt=enc_cnt+4;				//4 do DLC + 1
-			enc_state=DATA;
-			break;
+				enc_stuffframe[encstuff_cnt]=0;
+		        encstuff_cnt++;
+				enc_state=ID;
+				break;
 			
-		case DATA:
-			if(rtr=0){
-			for(i=0;i<dlc*8-1;i++){
-				enc_frame[i+enc_cnt]=buf_data[i];
-			}
-			enc_cnt=enc_cnt+dlc*8+1;				// dlc*8 bits do data +1
-			}
-			enc_state=CRC;
-			break;	
-		case CRC:
-			//!!!!!CALCULAR CRC!!!!!
-			for(i=0;i<15;i++){
-				enc_frame[i+enc_cnt]=buf_crc[i];
-			}
-			enc_cnt=enc_cnt+16;				// 15 do crc +1
+			case ID:
+				
+				if(i<11){
+				enc_frame[enc_cnt]=buf_id[i];
+				enc_stuffframe[encstuff_cnt]=buf_id[i];
+				enc_cnt++;
+				encstuff_cnt++;
+				i++;
+				}else{
+					i=0;
+					if(ide=1){
+						enc_frame[enc_cnt]=1;//seting SRR
+						enc_stuffframe[encstuff_cnt]=1;
+						enc_cnt++;
+						encstuff_cnt++;
+						enc_state=IDE;
+					}else{
+						enc_state=RTR;
+					}
+				}
+					
+				break;
+			
+			case ID2:
+			
+				if(i<18){
+					enc_frame[enc_cnt]=buf_id2[i];
+					enc_stuffframe[encstuff_cnt]=buf_id2[i];
+					enc_cnt++;
+					encstuff_cnt++;
+					i++;
+				}else{
+					i=0;
+					enc_state=RTR;
+				}
+				
+				break;
+			
+			case RTR:
+				if(rtr==0){
+					enc_frame[enc_cnt]=0;
+					enc_stuffframe[encstuff_cnt]=0;
+				}else{
+					enc_frame[enc_cnt]=1;
+					enc_stuffframe[encstuff_cnt]=1;
+				}
+				enc_cnt++;
+				encstuff_cnt++;
+				if(ide==0){
+					enc_state=IDE;
+					}else{
+					enc_state=CONTROL_RESBIT;	
+					}
+				break;
+			
+			case IDE:
+				enc_frame[enc_cnt]=ide;						//grava o IDE
+				enc_stuffframe[encstuff_cnt]=ide;
+				enc_cnt++;
+				encstuff_cnt++;
+				if(ide==0){
+					enc_state=CONTROL_RESBIT;
+					}else{
+					enc_state=ID2;	
+					}
+			
+			case CONTROL_RESBIT:
+				if(ide==0){
+					enc_frame[enc_cnt]=1;		//caso normal 1 bits reservado
+					enc_stuffframe[encstuff_cnt]=1;
+					enc_cnt++;
+					encstuff_cnt++;
+					enc_state=CONTROL;
+				}else{							//caso extendido 2 bits reservados
+					if(i<2){
+						enc_frame[enc_cnt]=1;
+						enc_stuffframe[encstuff_cnt]=1;
+						i++;
+						enc_cnt++;
+						encstuff_cnt++;
+					}else{
+						i=0;
+						enc_state=CONTROL;
+					}
+				}
+			case CONTROL:
+				if(i<4){
+					enc_frame[enc_cnt]=buf_dlc[i]; //grava o dlc em binário
+					enc_stuffframe[encstuff_cnt]=buf_dlc[i];
+					i++;
+					enc_cnt++;
+					encstuff_cnt++;
+				}else{
+					i=0;
+					enc_state=DATA;
+				}
+				
+				break;
+				
+			case DATA:
+				if(rtr=0){
+					if(i<dlc*8){		
+						enc_frame[enc_cnt]=buf_data[i];
+						enc_stuffframe[encstuff_cnt]=buf_data[i];
+						i++;
+						enc_cnt++;
+						encstuff_cnt++;
+					}else{
+						i=0;
+						enc_state=CRC;
+					}
+				
+				}else{
+					enc_state=CRC;
+				}
+				
+				break;	
+			
+			case CRC:
+				//!!!!!CALCULAR CRC!!!!!
+					if(i<15){
+					enc_frame[enc_cnt]=buf_crc[i];
+					enc_stuffframe[encstuff_cnt]=buf_crc[i];
+					i++;
+					enc_cnt++;
+					encstuff_cnt++;
+					}else{
+						i=0;
+						enc_state=CRC_D;
+					}
+				
+					
+				break;
+			
+			case CRC_D:
 				enc_frame[enc_cnt]=1;		//crc delimiter must be 1
-			enc_cnt++;	
-			enc_state=ACK;
-			break;
-		
-		case ACK:
-			enc_frame[enc_cnt]=1;			//ack transmiter must be 1
-			enc_cnt++;
-			enc_frame[enc_cnt]=1;			//ack delimeter
-			enc_cnt++;
-			enc_state=END;
-			break;
-		
-		case END:
-			for(i=0;i<7;i++){
-				enc_frame[i+enc_cnt]=1;
-			}				
-			enc_cnt=enc_cnt+8;
-			save_enc_cnt=enc_cnt;
-			enc_cnt=0;
-			break;
+				enc_stuffframe[encstuff_cnt]=1;
+				enc_cnt++;	
+				encstuff_cnt++;
+				enc_state=ACK;
+				break;
+			case ACK:
+				if(i<2){
+				enc_frame[enc_cnt]=1;			//ack transmiter must be 1
+				enc_stuffframe[encstuff_cnt]=1;
+				i++;
+				enc_cnt++;
+				encstuff_cnt++;
+			}else{
+				i=0;
+				enc_state=END;
+			}
+				
+				break;
 			
-		}
+			case END:
+				
+				if(i<7){
+					enc_frame[enc_cnt]=1;
+					enc_stuffframe[encstuff_cnt]=1;
+					i++;
+					enc_cnt++;
+					encstuff_cnt++;
+				}else{
+				i=0;
+				save_enc_cnt=enc_cnt;
+				save_encstuff_cnt=encstuff_cnt;
+				encstuff_cnt=0;
+				enc_cnt=0;
+				frame_build=1;	
+				}			
+				
+				break;
+				
+			}
+	}
 }
 void snd_msg(){
 	ofstream outFile;
@@ -239,8 +328,8 @@ void snd_msg(){
 	save_enc_cnt=0;
 	enc_frame=0;
 }
-int bit_stuf(){
-	if(actual_bit==past_bit){
+void bit_stuf(){
+	/*if(actual_bit==past_bit){
 		cnt_stuff++;
 	}else{
 		cnt_stuff=0;
@@ -249,6 +338,30 @@ int bit_stuf(){
 		return 1;
 	}else{
 		return 0;
-	}
+	}*/
 	
-}
+	if((enc_state!=ACK)and(enc_state!=END)and(enc_state!=CRC_D)){
+		if(bit_atual == 1) {
+	            cnt_bit_1++;
+	
+	            if(cnt_bit_1 == 5) {
+	                enc_stuffframe[encstuff_cnt]=0;
+	                encstuff_cnt++;
+	            }
+			} else {
+	            cnt_bit_1 = 0;
+	        }
+	
+	        if(bit_atual == 0) {
+	            cnt_bit_0++;
+	
+	            if(cnt_bit_0 == 5) {
+	                enc_stuffframe[encstuff_cnt]=1;
+	                encstuff_cnt++;
+	            } 
+			} else {
+	            cnt_bit_0 = 0;
+	        }
+	    }
+	}   
+
