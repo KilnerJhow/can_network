@@ -21,10 +21,10 @@ using namespace std;
 #define END 12
 
 volatile int enc_state = SOF;
-volatile int enc_cnt=0;
-volatile int encstuff_cnt=0;
-volatile int save_enc_cnt=0;
-volatile int i=0;
+volatile int enc_cnt = 0;
+volatile int encstuff_cnt = 0;
+volatile int save_enc_cnt = 0;
+// volatile int cnt = 0;
 volatile int rtr;
 volatile int ide;
 volatile int dlc;
@@ -45,6 +45,7 @@ uint16_t crc_convert = 0;
 int crc_next = 0;
 unsigned long long int crc_count = 0;
 
+// bitset <13>enc_frame;
 bitset <250>enc_frame;
 bitset <250>enc_stuffframe;
 bitset <250> buf_msg2send;
@@ -56,19 +57,20 @@ bitset <64> buf_data;
 
 /* run this program using the console pauser or add your own getch, system("pause") or input loop */
 void readNstore();
-void encoder_mws();
+void encoder_mws(int);
 void snd_msg();
 void bit_stuf();
-void calculate_crc(int i);
+void calculate_crc(int);
+void printFrame(int k, bitset<250> bs);
 int main() {
-	
+	// int cnt = 0;
 	readNstore();
 	// cout << "ID_A: " << hex << buf_id.to_ulong() << endl;
 	// cout << "ID_B: " << hex << buf_id2.to_ulong() << endl;
 	// cout << "DLC: " << hex << buf_dlc.to_ulong() << endl;
 	// cout << "Data: " << hex << buf_data.to_ullong() << endl;
 	cout << "DLC: " << dlc << endl;
-	encoder_mws();
+	encoder_mws(0);
    	snd_msg();
 	
 	
@@ -157,47 +159,68 @@ void readNstore(){
 	bitset <64> tmp_msg (data_msg);
 
 	buf_id = tmp_id_a;
+	cout << buf_id << endl;
 	buf_id2 = tmp_id_b;
 	buf_dlc = tmp_dlc;
 	buf_data = tmp_msg;
 }
 
-void encoder_mws(){
+void printFrame(int k, bitset<250> bs) {
+	for(int i = 0; i < k; i++) {
+		cout << bs[i];
+	}
+	cout << endl;
+}
+
+void encoder_mws(int cnt = 0){
 
 	while(frame_build == 0){
 		// cout << "Encoder while " << endl;
-		bit_stuf();
+		
 		// cout <<"Saindo bit stuff" << endl;
 		switch(enc_state){
 			
 			case SOF:
-					enc_frame[enc_cnt]=0;
+					enc_frame[enc_cnt] = 0;
+					calculate_crc(enc_cnt);
 					enc_cnt++;
-					enc_stuffframe[encstuff_cnt]=0;
+					enc_stuffframe[encstuff_cnt] = 0;
+					bit_stuf();
 					encstuff_cnt++;
-					enc_state=ID;
+					enc_state = ID;
+					cnt = 10;
+					// cout << enc_frame << endl;
+					// cout <<"Apos SOF" << endl;
 					// cout << "SOF indo para ID" << endl;
 				break;
 			
 			case ID:
 				
-				if(i<11){
-					// cout << "ID" << endl;
-					enc_frame[enc_cnt]=buf_id[i];
-					enc_stuffframe[encstuff_cnt]=buf_id[i];
+				if(cnt >= 0){
+					// cout << enc_frame << endl;
+					enc_frame[enc_cnt] = buf_id[cnt];
+					calculate_crc(enc_cnt);
+					enc_stuffframe[encstuff_cnt] = buf_id[cnt];
+					bit_stuf();
+					// cout << "i: " << i << endl;
+					// cout << "enc_cnt: " << enc_cnt << endl;
 					enc_cnt++;
 					encstuff_cnt++;
-					i++;
-				}else{
-					i=0;
-					if(ide=1){
-						enc_frame[enc_cnt]=1;//seting SRR
-						enc_stuffframe[encstuff_cnt]=1;
+					cnt--;
+				} else {
+					// exit(1);
+					cnt = 0;
+					printFrame(enc_cnt, enc_frame);
+					if(ide == 1){
+						enc_frame[enc_cnt] = 1;//seting SRR
+						calculate_crc(enc_cnt);
+						enc_stuffframe[encstuff_cnt]= 1;
+						bit_stuf();
 						enc_cnt++;
 						encstuff_cnt++;
-						enc_state=IDE;
+						enc_state = IDE;
 					}else{
-						enc_state=RTR;
+						enc_state = RTR;
 					}
 				}
 					
@@ -205,158 +228,179 @@ void encoder_mws(){
 			
 			case ID2:
 			
-				if(i<18){
-					enc_frame[enc_cnt]=buf_id2[i];
-					enc_stuffframe[encstuff_cnt]=buf_id2[i];
+				if(cnt >= 0){
+					enc_frame[enc_cnt] = buf_id2[cnt];
+					calculate_crc(enc_cnt);
+					enc_stuffframe[encstuff_cnt] = buf_id2[cnt];
+					bit_stuf();
 					enc_cnt++;
 					encstuff_cnt++;
-					i++;
+					cnt--;
 				}else{
-					i=0;
+					cnt = 0;
 					enc_state=RTR;
 				}
 				
 				break;
 			
 			case RTR:
-				if(rtr==0){
-					enc_frame[enc_cnt]=0;
-					enc_stuffframe[encstuff_cnt]=0;
+				if(rtr == 0){
+					enc_frame[enc_cnt] = 0;
+					calculate_crc(enc_cnt);
+					enc_stuffframe[encstuff_cnt] = 0;
+					bit_stuf();
 				}else{
-					enc_frame[enc_cnt]=1;
-					enc_stuffframe[encstuff_cnt]=1;
+					enc_frame[enc_cnt] = 1;
+					calculate_crc(enc_cnt);
+					enc_stuffframe[encstuff_cnt] = 1;
+					bit_stuf();
 				}
 				enc_cnt++;
 				encstuff_cnt++;
-				if(ide==0){
-					enc_state=IDE;
-					}else{
-					enc_state=CONTROL_RESBIT;	
-					}
+				if(ide == 0){
+					enc_state = IDE;
+				}else{
+					enc_state = CONTROL_RESBIT;	
+				}
 				break;
 			
 			case IDE:
-				enc_frame[enc_cnt]=ide;						//grava o IDE
-				enc_stuffframe[encstuff_cnt]=ide;
+				enc_frame[enc_cnt] = ide;						//grava o IDE
+				calculate_crc(enc_cnt);
+				enc_stuffframe[encstuff_cnt] = ide;
+				bit_stuf();
 				enc_cnt++;
 				encstuff_cnt++;
-				if(ide==0){
-					enc_state=CONTROL_RESBIT;
-					}else{
-					enc_state=ID2;	
-					}
+				if(ide == 0){
+					enc_state = CONTROL_RESBIT;
+				}else{
+					enc_state = ID2;
+					cnt = 17;	
+				}
 			
 			case CONTROL_RESBIT:
-				if(ide==0){
-					enc_frame[enc_cnt]=1;		//caso normal 1 bits reservado
-					enc_stuffframe[encstuff_cnt]=1;
+				if(ide == 0){
+					enc_frame[enc_cnt] = 0;		//caso normal 1 bits reservado
+					calculate_crc(enc_cnt);
+					enc_stuffframe[encstuff_cnt] = 0;
+					bit_stuf();
 					enc_cnt++;
 					encstuff_cnt++;
-					enc_state=CONTROL;
-				}else{							//caso extendido 2 bits reservados
-					if(i<2){
-						enc_frame[enc_cnt]=1;
-						enc_stuffframe[encstuff_cnt]=1;
-						i++;
+					enc_state = CONTROL;
+					cnt = 3;
+				} else {							//caso extendido 2 bits reservados
+					if(cnt < 2){
+						enc_frame[enc_cnt] = 1;
+						calculate_crc(enc_cnt);
+						enc_stuffframe[encstuff_cnt] = 1;
+						bit_stuf();
+						cnt++;
 						enc_cnt++;
 						encstuff_cnt++;
 					}else{
-						i=0;
-						enc_state=CONTROL;
+						cnt = 3;
+						enc_state = CONTROL;
 					}
 				}
 			case CONTROL:
-				if(i<4){
-					enc_frame[enc_cnt]=buf_dlc[i]; //grava o dlc em bin�rio
-					enc_stuffframe[encstuff_cnt]=buf_dlc[i];
-					i++;
+				if(cnt >= 0){
+					enc_frame[enc_cnt] = buf_dlc[cnt]; //grava o dlc em bin�rio
+					calculate_crc(enc_cnt);
+					enc_stuffframe[encstuff_cnt] = buf_dlc[cnt];
+					bit_stuf();
+					cnt--;
 					enc_cnt++;
 					encstuff_cnt++;
 					
 				}else{
-					cout <<" para DATA" << endl;
-					i=0;
-					enc_state=DATA;
+					cnt = dlc*8 - 1;
+					enc_state = DATA;
 				}
 				
 				break;
 				
 			case DATA:
 				if(rtr == 0){
-					if(i < (dlc*8)){		
-						enc_frame[enc_cnt]=buf_data[i];
-						enc_stuffframe[encstuff_cnt]=buf_data[i];
-						i++;
+					if(cnt >= 0){		
+						enc_frame[enc_cnt] = buf_data[cnt];
+						calculate_crc(enc_cnt);
+						enc_stuffframe[encstuff_cnt] = buf_data[cnt];
+						bit_stuf();
+						cnt--;
 						enc_cnt++;
 						encstuff_cnt++;
 
-						calculate_crc(crc_count);
+						
 						// cout <<"Data" << endl;
 					}else{
-						i=0;
+						cnt = 14;
 						enc_state = CRC;
-						// cout << "CRC calculado: "<< buf_crc << endl;
+						cout << "CRC calculado: "<< buf_crc << endl;
 					}
-					crc_count++;
+					
 				
 				}else{
 					enc_state=CRC;
+					cnt = 14;
 				}
 				
 				break;	
 			
 			case CRC:
-				//!!!!!CALCULAR CRC!!!!!
-					if(i < 15){	
-						enc_frame[enc_cnt] = buf_crc[i];
-						enc_stuffframe[encstuff_cnt] = buf_crc[i];
-						i++;
+					if(cnt >= 0){	
+						enc_frame[enc_cnt] = buf_crc[cnt];
+						enc_stuffframe[encstuff_cnt] = buf_crc[cnt];
+						bit_stuf();
+						cnt--;
 						enc_cnt++;
 						encstuff_cnt++;
 					}else{
-						i=0;
-						enc_state=CRC_D;
+						cnt = 0;
+						enc_state = CRC_D;
 					}
 				
 					
 				break;
 			
 			case CRC_D:
-				enc_frame[enc_cnt]=1;		//crc delimiter must be 1
-				enc_stuffframe[encstuff_cnt]=1;
+				enc_frame[enc_cnt] = 1;		//crc delimiter must be 1
+				enc_stuffframe[encstuff_cnt] = 1;
 				enc_cnt++;	
 				encstuff_cnt++;
-				enc_state=ACK;
+				enc_state = ACK;
 				break;
 			case ACK:
-				if(i<2){
-				enc_frame[enc_cnt]=1;			//ack transmiter must be 1
-				enc_stuffframe[encstuff_cnt]=1;
-				i++;
-				enc_cnt++;
-				encstuff_cnt++;
-			}else{
-				i=0;
-				enc_state=END;
-			}
 				
+				if(cnt < 2){
+					enc_frame[enc_cnt] = 1;			//ack transmiter must be 1
+					enc_stuffframe[encstuff_cnt] = 1;
+					cnt++;
+					enc_cnt++;
+					encstuff_cnt++;
+				}else{
+					cnt = 0;
+					enc_state=END;
+				}
+
 				break;
 			
 			case END:
 				
-				if(i<7){
-					enc_frame[enc_cnt]=1;
-					enc_stuffframe[encstuff_cnt]=1;
-					i++;
+				if(cnt < 7){
+					enc_frame[enc_cnt] = 1;
+					enc_stuffframe[encstuff_cnt] = 1;
+					cnt++;
 					enc_cnt++;
 					encstuff_cnt++;
-				}else{
-				i=0;
-				save_enc_cnt=enc_cnt;
-				save_encstuff_cnt=encstuff_cnt;
-				encstuff_cnt=0;
-				enc_cnt=0;
-				frame_build=1;	
+				} else {
+					printFrame(enc_cnt, enc_frame);
+					printFrame(encstuff_cnt, enc_stuffframe);
+					cnt = 0;
+					save_enc_cnt = enc_cnt;
+					save_encstuff_cnt = encstuff_cnt;
+					encstuff_cnt = 0;
+					enc_cnt = 0;
+					frame_build = 1;	
 				}			
 				
 				break;
@@ -373,7 +417,7 @@ void snd_msg(){
         exit(1);
     }
 	outFile<< "Começando escrita" << endl;
-	for(int i=0;i<save_encstuff_cnt;i++){
+	for(int i = 0; i < save_encstuff_cnt; i++){
 	
 		outFile <<enc_stuffframe[i];
 	}
@@ -395,29 +439,36 @@ void calculate_crc(int i) {
 
 void bit_stuf(){
 	
-	if((enc_state != ACK) && (enc_state!=END) && (enc_state!=CRC_D)){
+	if( (enc_state != ACK) && (enc_state!=END) && (enc_state!=CRC_D) ){
+		
 		if(enc_stuffframe[encstuff_cnt] == 1) {
 	            cnt_bit_1++;
 	
+
 	            if(cnt_bit_1 == 5) {
+	                encstuff_cnt++;
 	                enc_stuffframe[encstuff_cnt]=0;
-	                encstuff_cnt++;
+					cnt_bit_1 = 0;
 	            }
-			} else {
-	            cnt_bit_1 = 0;
-	        }
+
+		} else {
+			cnt_bit_1 = 0;
+		}
+
+		if(enc_stuffframe[encstuff_cnt] == 0) {
+			cnt_bit_0++;
 	
-	        if(enc_stuffframe[encstuff_cnt] == 0) {
-	            cnt_bit_0++;
-	
-	            if(cnt_bit_0 == 5) {
-	                enc_stuffframe[encstuff_cnt]=1;
-	                encstuff_cnt++;
-	            } 
-			} else {
-	            cnt_bit_0 = 0;
-	        }
-	    }
+			if(cnt_bit_0 == 5) {
+				encstuff_cnt++;
+				enc_stuffframe[encstuff_cnt] =1;
+				cnt_bit_0 = 0;
+				// cout << "Bit stuffing no 0, pos: "<< dec << enc_cnt << endl;
+			} 
+
+		} else {
+			cnt_bit_0 = 0;
+		}
+	}
 		// cout << "Fim do bit stuff" << endl;
 }   
 

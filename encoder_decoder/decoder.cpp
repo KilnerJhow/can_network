@@ -42,6 +42,15 @@ volatile int count_end_bits = 0;
 volatile int count_bus_idle = 0;
 
 
+struct frame {
+    volatile uint16_t   ID_A = 0;
+    volatile uint8_t    ID_B = 0;
+    volatile uint8_t    IDE = 0;
+    volatile uint8_t    RTR = 0;
+    volatile uint8_t    SRR = 0;
+    volatile uint64_t   data_msg = 0;
+};
+
 volatile int ID_A = 0;
 volatile int ID_B = 0;
 volatile int IDE = 0;
