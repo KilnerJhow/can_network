@@ -58,7 +58,7 @@ volatile int cnt_bit_1 = 0;
 
 uint16_t crc_int = 0;
 
-volatile int err_permission = 1;
+volatile int err_permission = 0;
 
 volatile int need_overload_frame = 0;
 volatile int crc_err_flag = 0;
@@ -183,7 +183,7 @@ void decoder_ms() {
                 //Lê bit r0
                 RTR = bit_12;
                 cout << " - RTR: " << RTR;
-                cout << " - IDE: " << IDE;
+                cout << " - IDE: " << IDE << endl;;
                 // cout << "Bit reservado: " << bit_atual << endl;
                 if(RTR == 0) decoder_state = DATA_FRAME;
                 else decoder_state = REMOTE_FRAME;
@@ -227,7 +227,7 @@ void decoder_ms() {
 
             if(count_remote == 3) { //21 do remote + 12 iniciais
                 cout << " - DLC: " << DLC;
-                cout << " - data: vazio";
+                cout << " - data: vazio" << endl;
                 // cout << " RTR: " << RTR;
                 decoder_state = CRC;
             }
@@ -244,7 +244,7 @@ void decoder_ms() {
 
             if(count_data == 3) {
                 if(DLC > 8) {
-                    cout << "DLC real: " << DLC << " ";
+                    cout << "DLC real: " << DLC << " " << endl;
                     DLC = 8;
                 }
             }
@@ -260,8 +260,8 @@ void decoder_ms() {
                 // cout << 
                 // bitset <64> dlc (data_msg);
                 // cout << "Saiu no bit: " << dec <<count << endl;
-                cout << " - DLC: " << DLC;
-                cout << " - data: " << hex << uppercase << data_msg;
+                cout << "DLC: " << DLC;
+                cout << " - data: " << hex << uppercase << data_msg << endl;
                 // cout << dlc << endl;
                 // exit(1);
                 decoder_state = CRC;
@@ -274,6 +274,7 @@ void decoder_ms() {
             break;
 
         case CRC:
+
             if(count_crc <= 14) {
                 crc_int = crc_int << 1 | (bit_atual & 1);             
             }

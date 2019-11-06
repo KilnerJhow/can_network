@@ -20,7 +20,7 @@ using namespace std;
 #define ACK 11
 #define END 12
 
-volatile int  enc_state = SOF;
+volatile int enc_state = SOF;
 volatile int enc_cnt=0;
 volatile int encstuff_cnt=0;
 volatile int save_enc_cnt=0;
@@ -37,6 +37,14 @@ volatile int bit_atual=0;
 volatile int save_encstuff_cnt=0;
 volatile int frame_build=0;
 
+
+const uint16_t crc_polinomial = 0x4599;
+bitset <15> crc_seq;
+bitset <15> crc_check;
+uint16_t crc_convert = 0;
+int crc_next = 0;
+unsigned long long int crc_count = 0;
+
 bitset <250>enc_frame;
 bitset <250>enc_stuffframe;
 bitset <250> buf_msg2send;
@@ -51,9 +59,15 @@ void readNstore();
 void encoder_mws();
 void snd_msg();
 void bit_stuf();
+void calculate_crc(int i);
 int main() {
 	
 	readNstore();
+	// cout << "ID_A: " << hex << buf_id.to_ulong() << endl;
+	// cout << "ID_B: " << hex << buf_id2.to_ulong() << endl;
+	// cout << "DLC: " << hex << buf_dlc.to_ulong() << endl;
+	// cout << "Data: " << hex << buf_data.to_ullong() << endl;
+	cout << "DLC: " << dlc << endl;
 	encoder_mws();
    	snd_msg();
 	
@@ -63,97 +77,117 @@ int main() {
 
 void readNstore(){
  	string line;
-    string id_a, id_b, rtr, ide, dlc, data;
+    string id_a_str, id_b_str, rtr_str, ide_str, dlc_str, data_str;	
+	unsigned long long int data_msg;
+	unsigned int id_a_hex;
+	unsigned int id_b_hex;
     int dlc_int = 0;
     ifstream inFile;
     stringstream toHex;
-    unsigned long long int data_msg;
-	unsigned int id_a_hex;
-	unsigned int id_b_hex;
     inFile.open("input.txt");
     getline(inFile, line);
 
-    cout << line << endl;
+    // cout << line << endl;
 
     size_t pos = line.find("ID_A = ");
     // size_t inc = 0;
     string a = "ID_A = ";
-    id_a = line.substr(pos + a.size(),3);
+    id_a_str = line.substr(pos + a.size(), 3);
 
     a = "ID_B = ";
     pos = line.find("ID_B = ");
     // cout << "Pos id b: " << pos << endl;
     if(pos != string::npos) {
-		id_b = line.substr(pos + a.size(), 5);
-		toHex << id_b;
+		id_b_str = line.substr(pos + a.size(), 5);
+		toHex << id_b_str;
 		toHex >> hex >> id_b_hex;
 		toHex.clear();
 	}
-    else id_b = "None";
+    else id_b_str = "None";
 
     // inc = a.size();
 
     pos = line.find("RTR = ");
     a = "RTR = ";
-    rtr = line.substr(pos + a.size(), 1);
+    rtr_str = line.substr(pos + a.size(), 1);
+	rtr = (int) rtr_str.at(0) - '0';
+	//'8' - '0' 
 
     pos = line.find("IDE = ");
     a = "IDE = ";
-    ide = line.substr(pos + a.size(), 1);
+    ide_str = line.substr(pos + a.size(), 1);
+	ide = (int) ide_str.at(0) - '0';
 
     pos = line.find("DLC = ");
     a = "DLC = ";
-    dlc = line.substr(pos + a.size(), 1);
+    dlc_str = line.substr(pos + a.size(), 1);
 
-    dlc_int = (int) dlc[0] - '0';
+    dlc_int = (int) dlc_str.at(0) - '0';
+	dlc = dlc_int;
     dlc_int = dlc_int * 2;
 
 
     pos = line.find("DATA = ");
     a = "DATA = ";
-    data = line.substr(pos + a.size(), dlc_int);
+    data_str = line.substr(pos + a.size(), dlc_int);
 
-    toHex << data;
+    toHex << data_str;
     toHex >> hex >> data_msg;
 	toHex.clear();
 
-	toHex << id_a;
+	toHex << id_a_str;
 	toHex >> hex >> id_a_hex;
 	toHex.clear();
 
-    cout << "ID_A: " << id_a << endl;
-    cout << "ID_A hex: " << uppercase << hex << id_a_hex << dec << endl;
-    cout << "ID_B: " << id_b << endl;
-    cout << "ID_B hex: " << uppercase << hex << id_b_hex << dec << endl;
-    cout << "RTR: " << rtr << endl;
-    cout << "IDE: " << ide << endl;
-    cout << "DLC: " << dlc << endl;
-    cout << "Data: " << data << endl;
-    cout << "Data inteiro: " << uppercase << hex << data_msg << endl;
-	 inFile.close();
+    // cout << "ID_A: " << id_a_str << endl;
+    // cout << "ID_A hex: " << uppercase << hex << id_a_hex << dec << endl;
+    // cout << "ID_B: " << id_b_str << endl;
+    // cout << "ID_B hex: " << uppercase << hex << id_b_hex << dec << endl;
+    // cout << "RTR: " << rtr_str << endl;
+    // cout << "IDE: " << ide_str << endl;
+    // cout << "DLC: " << dlc_str << endl;
+	// cout << "DLC int: " << dlc_int/2 << endl;
+    // cout << "Data: " << data_str << endl;
+    // cout << "Data inteiro: " << uppercase << hex << data_msg << endl;
+	inFile.close();
+
+	bitset <11> tmp_id_a (id_a_hex);
+	bitset <18> tmp_id_b (id_b_hex);
+	bitset <4> tmp_dlc (dlc_int/2);
+	bitset <64> tmp_msg (data_msg);
+
+	buf_id = tmp_id_a;
+	buf_id2 = tmp_id_b;
+	buf_dlc = tmp_dlc;
+	buf_data = tmp_msg;
 }
 
 void encoder_mws(){
-	while(frame_build=0){
+
+	while(frame_build == 0){
+		// cout << "Encoder while " << endl;
 		bit_stuf();
+		// cout <<"Saindo bit stuff" << endl;
 		switch(enc_state){
 			
 			case SOF:
-				enc_frame[enc_cnt]=0;
-				enc_cnt++;
-				enc_stuffframe[encstuff_cnt]=0;
-		        encstuff_cnt++;
-				enc_state=ID;
+					enc_frame[enc_cnt]=0;
+					enc_cnt++;
+					enc_stuffframe[encstuff_cnt]=0;
+					encstuff_cnt++;
+					enc_state=ID;
+					// cout << "SOF indo para ID" << endl;
 				break;
 			
 			case ID:
 				
 				if(i<11){
-				enc_frame[enc_cnt]=buf_id[i];
-				enc_stuffframe[encstuff_cnt]=buf_id[i];
-				enc_cnt++;
-				encstuff_cnt++;
-				i++;
+					// cout << "ID" << endl;
+					enc_frame[enc_cnt]=buf_id[i];
+					enc_stuffframe[encstuff_cnt]=buf_id[i];
+					enc_cnt++;
+					encstuff_cnt++;
+					i++;
 				}else{
 					i=0;
 					if(ide=1){
@@ -238,7 +272,9 @@ void encoder_mws(){
 					i++;
 					enc_cnt++;
 					encstuff_cnt++;
+					
 				}else{
+					cout <<" para DATA" << endl;
 					i=0;
 					enc_state=DATA;
 				}
@@ -246,17 +282,22 @@ void encoder_mws(){
 				break;
 				
 			case DATA:
-				if(rtr=0){
-					if(i<dlc*8){		
+				if(rtr == 0){
+					if(i < (dlc*8)){		
 						enc_frame[enc_cnt]=buf_data[i];
 						enc_stuffframe[encstuff_cnt]=buf_data[i];
 						i++;
 						enc_cnt++;
 						encstuff_cnt++;
+
+						calculate_crc(crc_count);
+						// cout <<"Data" << endl;
 					}else{
 						i=0;
-						enc_state=CRC;
+						enc_state = CRC;
+						// cout << "CRC calculado: "<< buf_crc << endl;
 					}
+					crc_count++;
 				
 				}else{
 					enc_state=CRC;
@@ -266,12 +307,12 @@ void encoder_mws(){
 			
 			case CRC:
 				//!!!!!CALCULAR CRC!!!!!
-					if(i<15){
-					enc_frame[enc_cnt]=buf_crc[i];
-					enc_stuffframe[encstuff_cnt]=buf_crc[i];
-					i++;
-					enc_cnt++;
-					encstuff_cnt++;
+					if(i < 15){	
+						enc_frame[enc_cnt] = buf_crc[i];
+						enc_stuffframe[encstuff_cnt] = buf_crc[i];
+						i++;
+						enc_cnt++;
+						encstuff_cnt++;
 					}else{
 						i=0;
 						enc_state=CRC_D;
@@ -331,30 +372,31 @@ void snd_msg(){
         cout << "Problema na abertura do arquivo!";
         exit(1);
     }
+	outFile<< "Começando escrita" << endl;
+	for(int i=0;i<save_encstuff_cnt;i++){
 	
-	for(int i=0;i<save_enc_cnt;i++){
-	
-	outFile <<enc_frame[i];
-}
+		outFile <<enc_stuffframe[i];
+	}
 	
 	outFile.close();
 	save_enc_cnt=0;
 	enc_frame=0;
 }
+
+void calculate_crc(int i) {
+    crc_next = enc_frame[i] ^ buf_crc[14];
+    buf_crc = buf_crc << 1;//Shift left de 1
+    buf_crc[0] = 0;
+    crc_convert = (uint16_t) buf_crc.to_ulong();
+    if(crc_next){
+        buf_crc = crc_convert ^ crc_polinomial;
+    }
+}
+
 void bit_stuf(){
-	/*if(actual_bit==past_bit){
-		cnt_stuff++;
-	}else{
-		cnt_stuff=0;
-	}		
-	if(cnt_stuff>=4){
-		return 1;
-	}else{
-		return 0;
-	}*/
 	
-	if((enc_state!=ACK)and(enc_state!=END)and(enc_state!=CRC_D)){
-		if(bit_atual == 1) {
+	if((enc_state != ACK) && (enc_state!=END) && (enc_state!=CRC_D)){
+		if(enc_stuffframe[encstuff_cnt] == 1) {
 	            cnt_bit_1++;
 	
 	            if(cnt_bit_1 == 5) {
@@ -365,7 +407,7 @@ void bit_stuf(){
 	            cnt_bit_1 = 0;
 	        }
 	
-	        if(bit_atual == 0) {
+	        if(enc_stuffframe[encstuff_cnt] == 0) {
 	            cnt_bit_0++;
 	
 	            if(cnt_bit_0 == 5) {
@@ -376,5 +418,6 @@ void bit_stuf(){
 	            cnt_bit_0 = 0;
 	        }
 	    }
-	}   
+		// cout << "Fim do bit stuff" << endl;
+}   
 

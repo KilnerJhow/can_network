@@ -87,6 +87,11 @@ int main() {
     cout << "Data: " << data << endl;
     cout << "Data inteiro: " << data_msg << endl;
 
+    bitset <11> id_1;
+    int id_ = 0x449;
+    bitset <11> tmp(id_);
+    id_1 = tmp;
+    cout << id_1 << endl;
     // bitset <148> buf;
     // bitset <126> frame;
 
