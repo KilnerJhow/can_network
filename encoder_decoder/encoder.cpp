@@ -62,12 +62,14 @@ int main() {
 }
 
 void readNstore(){
- string line;
+ 	string line;
     string id_a, id_b, rtr, ide, dlc, data;
     int dlc_int = 0;
     ifstream inFile;
     stringstream toHex;
-    long long int data_msg;
+    unsigned long long int data_msg;
+	unsigned int id_a_hex;
+	unsigned int id_b_hex;
     inFile.open("input.txt");
     getline(inFile, line);
 
@@ -80,8 +82,13 @@ void readNstore(){
 
     a = "ID_B = ";
     pos = line.find("ID_B = ");
-    cout << "Pos id b: " << pos << endl;
-    if(pos != string::npos) id_b = line.substr(pos + a.size(), 4);
+    // cout << "Pos id b: " << pos << endl;
+    if(pos != string::npos) {
+		id_b = line.substr(pos + a.size(), 5);
+		toHex << id_b;
+		toHex >> hex >> id_b_hex;
+		toHex.clear();
+	}
     else id_b = "None";
 
     // inc = a.size();
@@ -108,15 +115,21 @@ void readNstore(){
 
     toHex << data;
     toHex >> hex >> data_msg;
-	
+	toHex.clear();
+
+	toHex << id_a;
+	toHex >> hex >> id_a_hex;
+	toHex.clear();
 
     cout << "ID_A: " << id_a << endl;
+    cout << "ID_A hex: " << uppercase << hex << id_a_hex << dec << endl;
     cout << "ID_B: " << id_b << endl;
+    cout << "ID_B hex: " << uppercase << hex << id_b_hex << dec << endl;
     cout << "RTR: " << rtr << endl;
     cout << "IDE: " << ide << endl;
     cout << "DLC: " << dlc << endl;
     cout << "Data: " << data << endl;
-    cout << "Data inteiro: " << data_msg << endl;
+    cout << "Data inteiro: " << uppercase << hex << data_msg << endl;
 	 inFile.close();
 }
 
@@ -220,7 +233,7 @@ void encoder_mws(){
 				}
 			case CONTROL:
 				if(i<4){
-					enc_frame[enc_cnt]=buf_dlc[i]; //grava o dlc em binário
+					enc_frame[enc_cnt]=buf_dlc[i]; //grava o dlc em binï¿½rio
 					enc_stuffframe[encstuff_cnt]=buf_dlc[i];
 					i++;
 					enc_cnt++;
