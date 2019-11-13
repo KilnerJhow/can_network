@@ -19,6 +19,8 @@ using namespace std;
 #define CRC_D 10
 #define ACK 11
 #define END 12
+#define WAIT 13
+#define INTER 14
 
 volatile int enc_state = SOF;
 volatile int enc_cnt = 0;
@@ -36,9 +38,12 @@ volatile int cnt_bit_0=0;
 volatile int bit_atual=0;
 volatile int save_encstuff_cnt=0;
 volatile int frame_build=0;
-
-
-const uint16_t crc_polinomial = 0x4599;
+volatile int snd_cnt=0;
+volatile int snd_state=SENDBIT;
+volatile int sample_point=0;
+volatile int over_flag=0;
+volatile int erro_flag=0;
+const 0uint16_t crc_polinomial = 0x4599;
 bitset <15> crc_seq;
 bitset <15> crc_check;
 uint16_t crc_convert = 0;
@@ -173,7 +178,21 @@ void printFrame(int k, bitset<250> bs) {
 }
 
 void encoder_mws(int cnt = 0){
-
+	if(erro_flag==1){
+		enc_state=ERRO;
+		erro_flag=0;
+		enc_cnt=0;
+		encstuff_cnt=0;
+		cnt=0;
+	}
+	if(over_flag==1){
+		enc_state=OVER;
+		over_flag==0;
+		enc_cnt=0;
+		encstuff_cnt=0;
+		cnt=0;
+	}
+	
 	while(frame_build == 0){
 		// cout << "Encoder while " << endl;
 		
@@ -304,7 +323,7 @@ void encoder_mws(int cnt = 0){
 				}
 			case CONTROL:
 				if(cnt >= 0){
-					enc_frame[enc_cnt] = buf_dlc[cnt]; //grava o dlc em binï¿½rio
+					enc_frame[enc_cnt] = buf_dlc[cnt]; //grava o dlc em bin?rio
 					calculate_crc(enc_cnt);
 					enc_stuffframe[encstuff_cnt] = buf_dlc[cnt];
 					bit_stuf();
@@ -393,6 +412,21 @@ void encoder_mws(int cnt = 0){
 					enc_cnt++;
 					encstuff_cnt++;
 				} else {
+					
+					cnt = 0;
+					enc_state=INTER;	
+				}			
+				
+				break;
+			
+			case INTER:
+				if(cnt<3){
+					enc_frame[enc_cnt] = 1;
+					enc_stuffframe[encstuff_cnt] = 1;
+					cnt++;
+					enc_cnt++;
+					encstuff_cnt++;
+				}else{
 					printFrame(enc_cnt, enc_frame);
 					printFrame(encstuff_cnt, enc_stuffframe);
 					cnt = 0;
@@ -400,12 +434,32 @@ void encoder_mws(int cnt = 0){
 					save_encstuff_cnt = encstuff_cnt;
 					encstuff_cnt = 0;
 					enc_cnt = 0;
-					frame_build = 1;	
-				}			
-				
-				break;
-				
+					frame_build = 1;
+					enc_state=WAIT;	
+				}
+			break;
+		
+			case ERRO:
+				for(cnt=0;cnt<7;cnt++){
+					enc_stuffframe[encstuff_cnt] = 1;
+					encstuff_cnt++;
+				}
+				cnt=0;
+				enc_state=INTER;	
+				}
+				break;	
+		
+			case OVER:
+				for(cnt=0;cnt<7;cnt++){
+					enc_stuffframe[encstuff_cnt] = 1;
+					encstuff_cnt++;
+				}
+				cnt=0;
+				enc_state=INTER;	
+				}
+				break;	
 			}
+			
 	}
 }
 void snd_msg(){
@@ -416,7 +470,7 @@ void snd_msg(){
         cout << "Problema na abertura do arquivo!";
         exit(1);
     }
-	outFile<< "ComeÃ§ando escrita" << endl;
+	outFile<< "Começando escrita" << endl;
 	for(int i = 0; i < save_encstuff_cnt; i++){
 	
 		outFile <<enc_stuffframe[i];
@@ -426,6 +480,7 @@ void snd_msg(){
 	save_enc_cnt=0;
 	enc_frame=0;
 }
+
 
 void calculate_crc(int i) {
     crc_next = enc_frame[i] ^ buf_crc[14];
@@ -471,4 +526,3 @@ void bit_stuf(){
 	}
 		// cout << "Fim do bit stuff" << endl;
 }   
-
