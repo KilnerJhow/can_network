@@ -46,6 +46,15 @@ int main() {
 
     bitset <126> frame;
 
+    int enc_stuffframe[128];
+
+    enc_stuffframe[0] = 1;
+    enc_stuffframe[1] = 0;
+    enc_stuffframe[2] = 1;
+    cout << "0: " << enc_stuffframe[0] << endl;
+    cout << enc_stuffframe[1] <<endl;
+    cout << enc_stuffframe[2] <<endl;
+    /*
     for(int i = 0; i < a.size(); i++){
         buf[i] = (int)a.at(i) - '0';
         bit_atual = buf[i];
@@ -90,7 +99,7 @@ int main() {
     //     cout << "i: " << i << " bit atual: " << bit_atual  << " bit anterior: " << bit_anterior << " bit count stuffing: " << cnt_bit_stuffing << endl;
     //     i++;
     // }
-
+    */
     return 0;
 }
 

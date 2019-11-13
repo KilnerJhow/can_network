@@ -21,6 +21,7 @@ using namespace std;
 #define END 12
 #define WAIT 13
 #define INTER 14
+#define OVER 15
 
 volatile int enc_state = SOF;
 volatile int enc_cnt = 0;
@@ -43,7 +44,7 @@ volatile int snd_state=SENDBIT;
 volatile int sample_point=0;
 volatile int over_flag=0;
 volatile int erro_flag=0;
-const 0uint16_t crc_polinomial = 0x4599;
+const uint16_t crc_polinomial = 0x4599;
 bitset <15> crc_seq;
 bitset <15> crc_check;
 uint16_t crc_convert = 0;
@@ -470,7 +471,7 @@ void snd_msg(){
         cout << "Problema na abertura do arquivo!";
         exit(1);
     }
-	outFile<< "Começando escrita" << endl;
+	outFile<< "Comeï¿½ando escrita" << endl;
 	for(int i = 0; i < save_encstuff_cnt; i++){
 	
 		outFile <<enc_stuffframe[i];

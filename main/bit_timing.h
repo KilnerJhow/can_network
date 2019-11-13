@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include "Arduino.h"
 
 #define SYNC 0
 #define SEG_1 1
@@ -8,21 +9,26 @@
 
 class bit_timing {
     public:
-        uint8_t hard_sync;
-        uint8_t soft_sync;
-        uint8_t reset;
-        bit_timing();
-        void sample(uint8_t bit_atual);
-        void resync();
-        void resetStates();
-        void hardSync();
+
+        bit_timing(HardwareSerial *print);
+        void teste();
         void machine_state();
-        void checkEdge();
-        void checksync();
+        int sampling_point();
+        int writing_point();
+        void setHS(uint8_t hard_sync);
 
     private:
 
-        uint8_t bit_atual;
+        void hardSync();
+        void checksync();
+        // void checkEdge();
+        void resetStates();
+        void resync();
+        HardwareSerial* printer;
+
+        uint8_t hard_sync;
+        uint8_t reset;
+        uint8_t soft_sync;
         int cnt_sync;
         int cnt_seg_1;
         int resync1;
@@ -33,8 +39,8 @@ class bit_timing {
         const int time_segment2 = 7;
         uint8_t occurr_soft_sync;
         uint8_t window2;
-        uint8_t writing_point;
-        uint8_t sampling_point;
+        uint8_t writing_point_;
+        uint8_t sampling_point_;
         uint8_t past;
         uint8_t edge;
         uint8_t actual;

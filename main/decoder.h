@@ -23,10 +23,22 @@
 class decoder {
 
     public:
-        void decode_message();
-        decoder();
+        void decode_message(uint8_t bit_atual, uint8_t bit_enviado);
+        decoder(uint8_t &flag_err);
+        uint8_t getHS();
+        uint8_t getSendFlag();
 
     private:
+
+        // String recv_frame;
+
+        int recv_frame_count = 0;
+
+        uint8_t send_flag;
+
+        uint8_t hard_sync;
+
+        uint8_t *flag_err;
 
         uint16_t ID_A = 0;
         uint32_t ID_B = 0;
@@ -81,7 +93,7 @@ class decoder {
         uint16_t crc_convert = 0;
         uint8_t crc_next = 0;
 
-        void decoder_ms();
+        void decoder_ms(uint8_t bit_enviado);
         void check_crc();
         void check_bit_stuffing();
         void resetStates();

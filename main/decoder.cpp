@@ -1,17 +1,21 @@
 #include "decoder.h"
 
-decoder::decoder() {
+decoder::decoder(uint8_t &flag_err) {
+    this->flag_err = &flag_err;
     resetStates();
+    decoder_state = WAIT;
 }
 
-void decoder::decode_message() {
+void decoder::decode_message(uint8_t bit_atual, uint8_t bit_enviado) {
   
-    // bit_atual = buf[count];
+    this->bit_atual = bit_atual;
+
+    // recv_frame[recv_frame_count] = bit_atual & 1;
     // cout << "Bit atual: " << bit_atual << endl; 
     check_bit_stuffing();
     if(!flag_bit_stuff){
         // cout << " cnt igual: " << cnt_bit_igual << endl;
-        decoder_ms();
+        decoder_ms(bit_enviado);
     }
 
     if(next_bit_stuff) {
@@ -24,7 +28,7 @@ void decoder::decode_message() {
     if(decoder_state != BUS_IDLE) count++;
 }
 
-void decoder::decoder_ms() {
+void decoder::decoder_ms(uint8_t bit_enviado) {
     // frame = frame << 1; 
     // frame[0] = bit_atual & 1;
     frame_count++;
@@ -34,18 +38,20 @@ void decoder::decoder_ms() {
         case BUS_IDLE:
             // cout << "Barramento livre count: " << count << endl;
             if(bit_atual == 0 && count == 0) {
-                // frame.reset();
-                //hard sync
                 decoder_state = ARBITRATION;
                 err_permission = 1;
+                hard_sync = 1;  //Passar hard sync para o bit_timing
                 check_crc();
             } 
             break;
 
         case ARBITRATION:
             // cout << "Arbitration" << endl;
+            hard_sync = 0;
             if(count_arbitration <= 10) {
                 ID_A = ID_A << 1 | (bit_atual & 1);
+                if(bit_atual != bit_enviado) send_flag = 0;   //Flag para dizer se o dispositivo perdeu ou não a arbitração
+                                                                //Passada da main para o encoder e o decoder via ponteiro
                 check_crc();
             }
 
@@ -60,6 +66,7 @@ void decoder::decoder_ms() {
 
             if(count_ctrl_f == 0) {
                 bit_12 = bit_atual;
+                if(bit_atual != bit_enviado) send_flag = 0;
                 check_crc();
             }
             if(count_ctrl_f == 1) {
@@ -93,10 +100,12 @@ void decoder::decoder_ms() {
             if(count_ctrl_base_ext <= 17) {    
                 // cout << "Bit lido: " << bit_atual << endl;
                 ID_B = ID_B << 1 | (bit_atual & 1);            
+                if(bit_atual != bit_enviado) send_flag = 0;
             }
             
             if(count_ctrl_base_ext == 18){
                 RTR = bit_atual;
+                if(bit_atual != bit_enviado) send_flag = 0;
             }
 
             if(count_ctrl_base_ext == 20) { //2 bits reservados
@@ -184,7 +193,7 @@ void decoder::decoder_ms() {
 
         case ACK:
             if(count_ack == 0) {
-                if(bit_atual != 0)
+                // if(bit_atual != 0)
                     decoder_state = ERROR;
                 
             }
@@ -259,6 +268,7 @@ void decoder::decoder_ms() {
             // escreve 6 bits 0 e depois 8 bits 1, não se importa com a leitura
             //após a transmissão de 6 bits 1 o encoder envia bits 1 e espera a leitura deles
             if(count_error_0 == 5){
+
             }
 
             if(count_error_1 == 7) {  //após a transmissão de 1 bit recessivo, ele conta mais 7 bits recessivos
@@ -278,6 +288,8 @@ void decoder::decoder_ms() {
             if(count_bus_idle == 10) {
                 decoder_state = BUS_IDLE;
                 resetStates();
+                // flag_envio = 1; //Habilita o encoder a enviar mensagens
+                                    //Passada como ponteiro da main para o encoder e decoder
             }
 
             if(bit_atual == 1) {
@@ -315,6 +327,7 @@ void decoder::check_bit_stuffing() {
             if(cnt_bit_1 == 6) {
                 decoder_state = ERROR;
                 err_permission = 0;
+                *flag_err = 1;
             }
 
         } else {
@@ -331,6 +344,7 @@ void decoder::check_bit_stuffing() {
             if(cnt_bit_0 == 6) {
                 decoder_state = ERROR;
                 err_permission = 0;
+                *flag_err = 1;
             }
 
         } else {
@@ -341,6 +355,13 @@ void decoder::check_bit_stuffing() {
 
 void decoder::resetStates() {
 
+    // recv_frame = "";
+
+    send_flag = 1;
+
+    hard_sync = 0;
+
+    *flag_err = 1;
     count = 0;
     count_arbitration = 0;
     count_ctrl_f = 0;
@@ -387,4 +408,12 @@ void decoder::resetStates() {
     // crc_check.reset();
 
     // cout << "Estados resetados!" << endl;
+}
+
+uint8_t decoder::getHS() {
+    return this->hard_sync;
+}
+
+uint8_t decoder::getSendFlag() {
+    return send_flag;
 }
