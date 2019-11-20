@@ -6,8 +6,8 @@ bit_timing::bit_timing(HardwareSerial *print){
     actual_state = SYNC;
 }
 
-void bit_timing::teste(){
-    // printer->println("Hello World from bitset");
+void bit_timing::initialize(){
+    printer->println("Bit timing inicializado");
 }
 
 void bit_timing::resync() {
@@ -46,8 +46,12 @@ void bit_timing::resetStates() {
 
 void bit_timing::hardSync() {
     if(hard_sync == 1) {
+        printer->println("Bit timing hard sync");
         actual_state = SEG_1;
         resetStates();
+        writing_point_ = 1;
+        hard_sync = 0;
+        occurr_hard_sync = 1;
     }
 }
 
@@ -72,7 +76,11 @@ void bit_timing::machine_state() {
         case SEG_1:
             hardSync();
             if(cnt_seg_1 < (time_segment1  + resync1)) {
-                writing_point_ = 0;
+                if(occurr_hard_sync) {
+                    writing_point_ = 1;
+                    occurr_hard_sync = 0;
+                }
+                else writing_point_ = 0;
                 sampling_point_ = 0;
             } else {
                 actual_state = SEG_2;

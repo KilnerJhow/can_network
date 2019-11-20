@@ -57,6 +57,11 @@ volatile int cnt_bit_1 = 0;
 
 uint16_t crc_int = 0;
 
+
+int aux_cnt = 0;
+unsigned int buf_[15];
+int cnt_field = 0;
+
 volatile int err_permission = 0;
 
 volatile int need_overload_frame = 0;
@@ -89,7 +94,15 @@ void resetStates();
 int main() {
     string line;
     ifstream inFile;
-    
+    for(int i = 0; i < 15; i++) {
+        buf_[i] = 0;
+        cout << buf[i];
+    }
+    cout << endl;
+
+    aux_cnt = 0;
+    cout << "Aux cnt: " << aux_cnt << endl;
+
     inFile.open("in.txt");
 
     if(!inFile) {
@@ -106,6 +119,11 @@ int main() {
         decode_message();
     }
 
+    cout << "Frame: " << endl;
+    for(int i = frame_count - 1; i >= 0; i--) {
+        cout << frame[i];
+    }
+    cout << endl;
 
     inFile.close();
 }
@@ -145,10 +163,12 @@ void decoder_ms() {
                 //hard sync
                 decoder_state = ARBITRATION;
                 err_permission = 1;
+                check_crc(frame_count);
             } 
             break;
 
         case ARBITRATION:
+            check_crc(frame_count);
             // cout << "Arbitration" << endl;
             if(count_arbitration <= 10) {
                 ID_A = ID_A << 1 | (bit_atual & 1);
@@ -164,6 +184,8 @@ void decoder_ms() {
             break;
 
         case CTRL_F:
+            
+            check_crc(frame_count);
 
             if(count_ctrl_f == 0) bit_12 = bit_atual;
             if(count_ctrl_f == 1) {
@@ -175,7 +197,9 @@ void decoder_ms() {
             break;
 
         case CTRL_BASE_F: 
- 
+
+            check_crc(frame_count);
+
             if(count_ctrl_base_f == 0) {
                 //Lê bit r0
                 RTR = bit_12;
@@ -190,6 +214,8 @@ void decoder_ms() {
 
 
         case CTRL_EXTENDED_F:
+
+            check_crc(frame_count);
             
             if(count_ctrl_base_ext <= 17) {    
                 // cout << "Bit lido: " << bit_atual << endl;
@@ -216,6 +242,8 @@ void decoder_ms() {
             break;
 
         case REMOTE_FRAME:
+
+            check_crc(frame_count);
             
             if(count_remote <= 3 ) {
                 // cout << "dlc lido no bit: " << dec << count << endl;
@@ -232,6 +260,9 @@ void decoder_ms() {
             break;
         
         case DATA_FRAME:
+
+            check_crc(frame_count);
+
             // cout << "Entrou no data frame" << endl;
             if(count_data <= 3 ) {
                 // cout << "dlc lido no bit: " << dec << count << endl;
@@ -250,6 +281,15 @@ void decoder_ms() {
                 
                 // cout << "data lido no bit: " << dec << count << endl;
                 data_msg = data_msg << 1 | (bit_atual & 1);
+                if(aux_cnt == 7) {
+                    int a = data_msg & 255;
+                    cout << hex << a << endl;
+                    buf_[cnt_field] = data_msg & 255;
+                    cout << "Buf: " << buf_[cnt_field] << endl;
+                    cnt_field++;
+                    aux_cnt = 0;
+                }
+                else aux_cnt++;
             }
 
             
@@ -257,6 +297,12 @@ void decoder_ms() {
                 // cout << 
                 // bitset <64> dlc (data_msg);
                 // cout << "Saiu no bit: " << dec <<count << endl;
+                // cout << "Buf: " << endl;
+                for(int i = 0; i < cnt_field; i++) {
+                    cout << buf_[i];
+                }
+                cout << endl;
+
                 cout << "DLC: " << DLC;
                 cout << " - data: " << hex << uppercase << data_msg << endl;
                 // cout << dlc << endl;
@@ -268,19 +314,21 @@ void decoder_ms() {
                 // cout << "CRC calculado: " << crc_seq << endl;
             }
             count_data++;
+           
             break;
 
         case CRC:
 
             if(count_crc <= 14) {
-                crc_int = crc_int << 1 | (bit_atual & 1);             
+                crc_int = crc_int << 1 | (bit_atual & 1);    
+                check_crc(frame_count);         
             }
 
             if(count_crc == 14) {
 
-                for(int i = frame_count; i >= 0; i--) { //-1 devido ao crc delimiter
-                    check_crc(i);
-                }
+                // for(int i = frame_count; i >= 0; i--) { //-1 devido ao crc delimiter
+                //     check_crc(i);
+                // }
                 bitset <15> crc(crc_int);
                 // cout << "CRC lido: " << crc << endl;
                 // cout << "CRC check: " << crc_check << endl;
@@ -291,9 +339,9 @@ void decoder_ms() {
                     cout << "CRC check: " << crc_check << endl;
                     crc_err_flag = 1;
                     // exit(1);
-                } /*else {
+                } else {
                     cout << "CRC ok!" << endl;
-                }*/
+                }
                 err_permission = 0;
             }
 
