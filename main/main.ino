@@ -31,7 +31,7 @@ void setup(){
 
     digitalWrite(PIN_TX, bit_enviado);
 
-    Serial.begin(9600);
+    Serial.begin(115200);
     Serial.println("Inicializado");
     
     bt.initialize();
@@ -56,7 +56,7 @@ void setup(){
 }
 
 void loop() {
-    if(!sender)
+    // if(!sender)
         dec.printData();
 }
 
@@ -73,11 +73,11 @@ void tq_ISR() {
     bt.machine_state();
     //Se Writing Point = 1
     if(bt.writing_point()) {
-        if(dec.getFlagACK() && !sender){
+        if(dec.getFlagACK() /*&& !sender*/){
             Serial.println("Enviando ACK slot");
-            bit_enviado = 0;
+            bit_enviado = 1;
             writeBus();
-        } else if(enc.canSendMsg() && sender) {
+        } else if(enc.canSendMsg() /*&& sender*/) {
             bit_enviado = enc.enviaBit();
             writeBus();
             // Serial.print("E: ");
@@ -96,14 +96,15 @@ void tq_ISR() {
 
         dec.decode_message(bit_atual, bit_enviado);
         bt.setHS(dec.getHS());
+        
         enc.setSendFlag(dec.getSendFlag());
         enc.setResetFlag(dec.getResetFlag());
         
-        // Serial.print("Flag de erro no main: ");
-        // Serial.println(dec.getErrorflag());
+        // Serial.print("Flag de mount no main: ");
+        // Serial.println(dec.getMountFrame());
 
-        // enc.setErrorFlag(dec.getErrorflag());
-        // enc.setMountFrame(dec.getMountFrame());
+        enc.setErrorFlag(dec.getErrorflag());
+        enc.setMountFrame(dec.getMountFrame());
 
     }
 

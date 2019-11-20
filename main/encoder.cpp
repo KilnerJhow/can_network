@@ -337,7 +337,7 @@ void encoder::encoder_mws(int cnt = 0){
 					encstuff_cnt = 0;
 					enc_cnt = 0;
 					frame_build = 1;
-					enc_state = WAIT;
+					// enc_state = WAIT;
 
 					
 					// printer->println("Frame montado");
@@ -384,10 +384,13 @@ void encoder::encoder_mws(int cnt = 0){
 void encoder::setErrorFlag(uint8_t flag_err){
 	if(flag_err) {
 		erro_flag = 1;
-		// printer->println("Encoder flag de erro setada");
+		printer->println("Encoder flag de erro setada");
 		encoder_mws(0);
 		cnt_envio = 0;
 		frame_build = 0;
+		printer->println("Frame de erro montado");
+		printFrameStuff();
+		printer->println("Frame de erro montado");
 	} 
 }
 
@@ -395,7 +398,11 @@ void encoder::setMountFrame(uint8_t flag){
 	if(flag) {
 		// printer->println("\nMontando frame");
 		//mount_frame = 0;
+		frame_build = 0;
+		enc_state = SOF;
+		resetStates();
 		encoder_mws(0);
+		printer->println("Frame montado: ");
 		printFrameStuff();
 		// printer->println();
 		
@@ -412,10 +419,10 @@ void encoder::printFrameNoStuff(){
 
 void encoder::printFrameStuff(){
 	// printer->println("Frame: ");
-	// for(int i = 0; i < save_encstuff_cnt; i++){
-	// 	printer->print(enc_stuffframe[i]);
-	// }
-	// printer->println();
+	for(int i = 0; i < save_encstuff_cnt; i++){
+		printer->print(enc_stuffframe[i]);
+	}
+	printer->println();
 }
 
 void encoder::calculate_crc() {

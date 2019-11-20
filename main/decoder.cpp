@@ -45,7 +45,7 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
             resetFlagCntEncoder = 0;
             if(bit_atual == 0) {
        
-                printer->println("Recebendo frame");
+                // printer->println("Recebendo frame");
                 // printer->print("CNT bit 0 no bus idle: ");
                 // printer->println(cnt_bit_0);
                 // printer->print("CNT bit 1: ");
@@ -54,7 +54,7 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
                 // printer->print("Flag erro dec: ");
 	            // printer->println(flag_erro);
 
-                // printer->println("Saindo do BUS_IDLE");
+                printer->println("Saindo do BUS_IDLE");
                 decoder_state = ARBITRATION;
                 err_permission = 1;
                 hard_sync = 1;  //Passar hard sync para o bit_timing
@@ -76,8 +76,8 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
 
             if(count_arbitration == 10) {
                 // printer->println("ID recebido, imprimindo");
-                // printer->print("ID_A: ");
-                // printer->print(ID_A, HEX);
+                printer->print("ID_A: ");
+                printer->print(ID_A, HEX);
                 printer->println();
 
 
@@ -97,8 +97,8 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
             if(count_ctrl_f == 1) {
                 IDE = bit_atual;
                 
-                // printer->print("IDE: ");
-                // printer->println(IDE);
+                printer->print("IDE: ");
+                printer->println(IDE);
 
                 check_crc(bit_atual);
                 if(IDE == 1) decoder_state = CTRL_EXTENDED_F;
@@ -114,8 +114,8 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
                 check_crc(bit_atual);
                 RTR = bit_12;
 
-                // printer->print("RTR: ");
-                // printer->println(RTR);
+                printer->print("RTR: ");
+                printer->println(RTR);
 
                 if(RTR == 0) decoder_state = DATA_FRAME;
                 else decoder_state = REMOTE_FRAME;
@@ -176,9 +176,9 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
 
             if(count_data == 3) {
                 
-                // printer->print("DLC: ");
-                // printer->print(DLC);
-                // printer->println();
+                printer->print("DLC: ");
+                printer->print(DLC);
+                printer->println();
 
                 if(DLC > 8) {
                     DLC = 8;
@@ -207,6 +207,12 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
 
             
             if(count_data == (3 + DLC * 8)) {
+                printer->print("Data: ");
+                for(int i = 0; i < cnt_field; i++) {
+                    printer->print(buf_data[i], HEX);
+                }
+                printer->println();
+                // printData();
                 decoder_state = CRC;
             }
             count_data++;
@@ -224,8 +230,8 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
                 // printer->print("CRC: ");
                 // printer->println(crc_int, BIN);
                 // printer->println(crc_str);
-                // printer->print("CRC check: ");
-                // printer->println(crc_check);
+                printer->print("CRC check: ");
+                printer->println(crc_check);
                 if(crc_check != 0) {
                     crc_err_flag = 1;
                     // exit(1);
@@ -235,7 +241,7 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
 
             // cout << "depois CRC: " << crc << endl;
             if(count_crc == 15) { //conta tbm o crc delimiter
-                // printer->println("CRC delimiter");
+                printer->println("CRC delimiter");
                 if(bit_atual == 0) {
                     decoder_state = ERROR;
                     flag_erro = 1;
@@ -255,7 +261,7 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
             if(count_ack == 0) {
                 flagACK = 0;
                 if(bit_atual != 0) {
-                    printer->println("ACK error");
+                    // printer->println("ACK error");
                     decoder_state = ERROR;
                     flag_erro = 1;
                 }
@@ -264,16 +270,16 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
             }
 
             if(count_ack == 1) {    //ack delimiter
-                // printer->println("ACK delimiter");
+                printer->println("ACK delimiter");
                 if(crc_err_flag) {
-                    printer->println("CRC error");
+                    // printer->println("CRC error");
                     decoder_state = ERROR;
                 } else if(bit_atual == 0) {
-                    printer->println("Erro de bit atual no ack delimiter");
+                    // printer->println("Erro de bit atual no ack delimiter");
                     decoder_state = ERROR;
                 }
                 else {
-                    // printer->println("TO EOF");
+                    printer->println("TO EOF");
                     decoder_state = END_OF_FRAME;
                     // cout << "ACK delimiter ok" << endl;
                 }
@@ -288,7 +294,7 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
                 // cout << "Ate EOF" << endl;
                 if(need_overload_frame) decoder_state = OVERLOAD_FRAME;
                 else {
-                    // printer->println("EOF");
+                    printer->println("EOF");
                     decoder_state = INTERMISSION;
                 }
             }
@@ -308,15 +314,15 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
 
             if(count_ifs == 2) {
                 // cout << "Interframe space count: " << count_ifs << endl;
-                // printer->println("Intermission");
-                // printer->println("Indo para o BUS IDLE");
+                printer->println("Intermission");
+                printer->println("Indo para o BUS IDLE");
                 
                 decoder_state = BUS_IDLE;
                 resetStates();
                 err_permission = 0;
                 resetFlagCntEncoder = 1;
 
-                printer->println("Frame recebido/enviado");
+                // printer->println("Frame recebido/enviado");
 
                 // printer->print("CNT bit 0 no intermission: ");
                 // printer->println(cnt_bit_0);
@@ -352,11 +358,11 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
             // escreve 6 bits 0 e depois 8 bits 1, não se importa com a leitura
             //após a transmissão de 6 bits 1 o encoder envia bits 1 e espera a leitura deles
             if(count_error_0 == 5){
-                // printer->println("6 bits 0 recebidos no estado erro do decoder");
+                printer->println("6 bits 0 recebidos no estado erro do decoder");
             }
 
             if(count_error_1 == 7) {  //após a transmissão de 1 bit recessivo, ele conta mais 7 bits recessivos
-                // printer->println("8 bits 1 recebidos no estado erro do decoder");
+                printer->println("8 bits 1 recebidos no estado erro do decoder");
                 decoder_state = WAIT;   //após o frame de erro, pode vir frames de overload
                 mount_frame = 1;
                 // aux = -1;
@@ -375,7 +381,7 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
             mount_frame = 0;
             if(count_bus_idle == 10) {
                 decoder_state = BUS_IDLE;
-                // printer->println("Saindo do WAIT");
+                printer->println("Saindo do WAIT");
                 resetStates();
                 flag_erro = 0;
                 resetFlagCntEncoder = 1;
@@ -399,7 +405,7 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
 
 void decoder::printData(){
     if(decoder_state == INTERMISSION && notPrinted) {
-        printer->print("ID_A: ");
+        printer->print("\nID_A: ");
         printer->print(ID_A, HEX);
         printer->print(" - RTR: ");
         printer->print(RTR);
@@ -408,7 +414,6 @@ void decoder::printData(){
         printer->print(" - DLC: ");
         printer->print(DLC);
         printer->print(" - Data: ");
-                    // printer->print(data_msg);
         for(int i = 0; i < cnt_field; i++) {
             printer->print(buf_data[i], HEX);
         }
