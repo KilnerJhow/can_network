@@ -20,6 +20,7 @@
 #define INTERMISSION 11
 #define OVERLOAD_FRAME 12
 #define BUS_IDLE 13
+#define WAIT_INIT 14
 
 class decoder {
 
@@ -114,5 +115,6 @@ class decoder {
         void check_crc(uint8_t bit_atual);
         void check_bit_stuffing(uint8_t bit_atual);
         void resetStates();
+        void checkBit(uint8_t bit_atual, uint8_t bit_enviado);
 
 };

@@ -28,7 +28,7 @@
 class encoder{
 
     public:
-        encoder(/*uint8_t &flag_err,*/ HardwareSerial *print);
+        encoder(HardwareSerial *print);
         void encoder_mws(int cnt);
         void initialize();
         uint8_t enviaBit();
@@ -54,16 +54,18 @@ class encoder{
         uint8_t sendFlag;
 
         uint8_t cnt_envio;
-        uint16_t buf_id_1 = 0x0672;
+        uint8_t cnt_err_envio;
+        uint16_t buf_id_1 = 0x0449; //0x0673
         uint32_t buf_id_2 = 0x3007A;
         uint8_t rtr = 0;
-        uint8_t ide = 0;
+        uint8_t ide = 1;
         uint8_t dlc = 8;
         uint8_t buf_dlc = 8;
         uint64_t buf_data = 0xAAAAAAAAAAAAAAAA; 
 
         int enc_frame[150];
         int enc_stuffframe[250];
+        int enc_frame_err[14];
         uint8_t enc_state = SOF;
         uint16_t enc_cnt = 0;
         uint16_t encstuff_cnt = 0;

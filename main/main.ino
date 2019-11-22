@@ -6,22 +6,14 @@
 #define PIN_RX 2
 #define PIN_TX 3
 
-
-uint8_t flag_err = 0;
 uint8_t bit_enviado = 1;
 uint8_t bit_atual = 1;
- 
-
 
 // decoder dec(flag_err);
 bit_timing bt(&Serial);
-decoder dec(/*flag_err,*/ &Serial);
-encoder enc(/*flag_err, */&Serial);
+decoder dec(&Serial);
+encoder enc(&Serial);
 
-uint8_t id[11];
-uint16_t id_a = 0x0672;
-int cnt = 10;
-int id_cnt = 0;
 uint8_t sender = 1; //trasmissor = 1, receptor = 0
 
 void setup(){
@@ -40,7 +32,8 @@ void setup(){
 
 
     enc.encoder_mws(0);
-    // enc.printFrame();
+    enc.printFrameNoStuff();
+    enc.printFrameStuff();
 
     Timer1.attachInterrupt(tq_ISR);
     Timer1.initialize(10000);
@@ -69,41 +62,46 @@ uint8_t readBus(){
 }
 
 void tq_ISR() {
-    // Serial.println("tq");
+
     bt.machine_state();
     //Se Writing Point = 1
     if(bt.writing_point()) {
-        if(dec.getFlagACK() /*&& !sender*/){
+        if(dec.getFlagACK() && !enc.canSendMsg()){
+
             Serial.println("Enviando ACK slot");
             bit_enviado = 1;
             writeBus();
-        } else if(enc.canSendMsg() /*&& sender*/) {
+
+        } else if(enc.canSendMsg()) {
+            // Serial.println("Enviando bit");
             bit_enviado = enc.enviaBit();
             writeBus();
             // Serial.print("E: ");
-            // Serial.println(bit_enviado);
+            // Serial.print(bit_enviado);
+
         }  else {
+            
             bit_enviado = 1;
             writeBus();
+
         }
     }
 
     if(bt.sampling_point()) {
         bit_atual = readBus();
-        
-        // Serial.print("R: ");
+
+        // Serial.print(" R: ");
         // Serial.println(bit_atual);
 
         dec.decode_message(bit_atual, bit_enviado);
         bt.setHS(dec.getHS());
         
         enc.setSendFlag(dec.getSendFlag());
+
         enc.setResetFlag(dec.getResetFlag());
-        
-        // Serial.print("Flag de mount no main: ");
-        // Serial.println(dec.getMountFrame());
 
         enc.setErrorFlag(dec.getErrorflag());
+        
         enc.setMountFrame(dec.getMountFrame());
 
     }

@@ -4,7 +4,7 @@ decoder::decoder(/*uint8_t &flag_erro,*/ HardwareSerial* print) {
     printer = print;
     // this->flag_erro = &flag_erro;
     resetStates();
-    decoder_state = WAIT;
+    decoder_state = WAIT_INIT;
 }
 
 void decoder::initialize(){
@@ -18,16 +18,11 @@ void decoder::decode_message(uint8_t bit_atual, uint8_t bit_enviado) {
         decoder_ms(bit_atual, bit_enviado);
     }
 
-    if(next_bit_stuff) {
-        
-        
-        // printer->print("CNT bit 0: ");
-        // printer->println(cnt_bit_0);
-        // printer->print("CNT bit 1: ");
-        // printer->println(cnt_bit_1);
+    if(next_bit_stuff) {        
         
         flag_bit_stuff = 1;
         next_bit_stuff = 0;
+
     } else {
         flag_bit_stuff = 0;
     }
@@ -38,23 +33,16 @@ void decoder::decode_message(uint8_t bit_atual, uint8_t bit_enviado) {
 void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
 
     frame_count++;
+    // checkBit(bit_atual, bit_enviado);
     switch(decoder_state) {
 
         case BUS_IDLE:
             mount_frame = 0;
             resetFlagCntEncoder = 0;
             if(bit_atual == 0) {
-       
-                // printer->println("Recebendo frame");
-                // printer->print("CNT bit 0 no bus idle: ");
-                // printer->println(cnt_bit_0);
-                // printer->print("CNT bit 1: ");
-                // printer->println(cnt_bit_1);
-       
-                // printer->print("Flag erro dec: ");
-	            // printer->println(flag_erro);
-
-                printer->println("Saindo do BUS_IDLE");
+                
+                notPrinted = 1;
+                // printer->println("Saindo do BUS_IDLE");
                 decoder_state = ARBITRATION;
                 err_permission = 1;
                 hard_sync = 1;  //Passar hard sync para o bit_timing
@@ -65,12 +53,14 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
             break;
 
         case ARBITRATION:
-            // cout << "Arbitration" << endl;
             hard_sync = 0;
             if(count_arbitration <= 10) {
                 ID_A = ID_A << 1 | (bit_atual & 1);
-                if(bit_atual != bit_enviado) send_flag = 0;   //Flag para dizer se o dispositivo perdeu ou não a arbitração
+                if(bit_atual != bit_enviado) {
+                    printer->println("Arbitracao perdida");
+                    send_flag = 0;   //Flag para dizer se o dispositivo perdeu ou não a arbitração
                                                                 //Passada da main para o encoder e o decoder via ponteiro
+                }
                 check_crc(bit_atual);
             }
 
@@ -91,6 +81,10 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
 
             if(count_ctrl_f == 0) {
                 bit_12 = bit_atual;
+                
+                printer->print("Bit 12: ");
+                printer->println(bit_12);
+
                 if(bit_atual != bit_enviado) send_flag = 0;
                 check_crc(bit_atual);
             }
@@ -114,8 +108,8 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
                 check_crc(bit_atual);
                 RTR = bit_12;
 
-                printer->print("RTR: ");
-                printer->println(RTR);
+                // printer->print("RTR: ");
+                // printer->println(RTR);
 
                 if(RTR == 0) decoder_state = DATA_FRAME;
                 else decoder_state = REMOTE_FRAME;
@@ -136,14 +130,23 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
                 if(bit_atual != bit_enviado) send_flag = 0;
             }
             
+            if(count_ctrl_base_ext == 17){
+                printer->print("ID_B: ");
+                printer->println(ID_B, HEX);
+            }
+
             if(count_ctrl_base_ext == 18){
                 RTR = bit_atual;
+                printer->print("RTR: ");
+                printer->println(RTR);
                 if(bit_atual != bit_enviado) send_flag = 0;
             }
 
             if(count_ctrl_base_ext == 20) { //2 bits reservados
-                // bitset <18> idb(ID_B);
+                
                 SRR = bit_12;
+                printer->print("SRR: ");
+                printer->println(SRR);
                 if(RTR == 1) decoder_state = REMOTE_FRAME;
                 else {
                     decoder_state = DATA_FRAME;
@@ -166,7 +169,9 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
             break;
         
         case DATA_FRAME:
-            // cout << "Entrou no data frame" << endl;
+            
+            // flag_erro = 1;
+            // decoder_state = ERROR;
             if(count_data <= 3 ) {
                 // cout << "dlc lido no bit: " << dec << count << endl;
                 DLC = DLC << 1 | (bit_atual & 1);
@@ -176,9 +181,9 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
 
             if(count_data == 3) {
                 
-                printer->print("DLC: ");
-                printer->print(DLC);
-                printer->println();
+                // printer->print("DLC: ");
+                // printer->print(DLC);
+                // printer->println();
 
                 if(DLC > 8) {
                     DLC = 8;
@@ -207,11 +212,11 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
 
             
             if(count_data == (3 + DLC * 8)) {
-                printer->print("Data: ");
-                for(int i = 0; i < cnt_field; i++) {
-                    printer->print(buf_data[i], HEX);
-                }
-                printer->println();
+                // printer->print("Data: ");
+                // for(int i = 0; i < cnt_field; i++) {
+                    // printer->print(buf_data[i], HEX);
+                // }
+                // printer->println();
                 // printData();
                 decoder_state = CRC;
             }
@@ -230,8 +235,8 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
                 // printer->print("CRC: ");
                 // printer->println(crc_int, BIN);
                 // printer->println(crc_str);
-                printer->print("CRC check: ");
-                printer->println(crc_check);
+                // printer->print("CRC check: ");
+                // printer->println(crc_check);
                 if(crc_check != 0) {
                     crc_err_flag = 1;
                     // exit(1);
@@ -241,7 +246,7 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
 
             // cout << "depois CRC: " << crc << endl;
             if(count_crc == 15) { //conta tbm o crc delimiter
-                printer->println("CRC delimiter");
+                // printer->println("CRC delimiter");
                 if(bit_atual == 0) {
                     decoder_state = ERROR;
                     flag_erro = 1;
@@ -261,7 +266,7 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
             if(count_ack == 0) {
                 flagACK = 0;
                 if(bit_atual != 0) {
-                    // printer->println("ACK error");
+                    printer->println("ACK error");
                     decoder_state = ERROR;
                     flag_erro = 1;
                 }
@@ -270,7 +275,7 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
             }
 
             if(count_ack == 1) {    //ack delimiter
-                printer->println("ACK delimiter");
+                // printer->println("ACK delimiter");
                 if(crc_err_flag) {
                     // printer->println("CRC error");
                     decoder_state = ERROR;
@@ -279,7 +284,7 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
                     decoder_state = ERROR;
                 }
                 else {
-                    printer->println("TO EOF");
+                    // printer->println("TO EOF");
                     decoder_state = END_OF_FRAME;
                     // cout << "ACK delimiter ok" << endl;
                 }
@@ -294,7 +299,7 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
                 // cout << "Ate EOF" << endl;
                 if(need_overload_frame) decoder_state = OVERLOAD_FRAME;
                 else {
-                    printer->println("EOF");
+                    // printer->println("EOF");
                     decoder_state = INTERMISSION;
                 }
             }
@@ -306,7 +311,6 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
             break;
         
         case INTERMISSION:
-            // cout << "Intermission" << endl;
             if(bit_atual == 0 && count_ifs <= 1) {
                 //diz ao encoder para escrever 6 0
                 decoder_state = OVERLOAD_FRAME;
@@ -315,7 +319,7 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
             if(count_ifs == 2) {
                 // cout << "Interframe space count: " << count_ifs << endl;
                 printer->println("Intermission");
-                printer->println("Indo para o BUS IDLE");
+                // printer->println("Indo para o BUS IDLE");
                 
                 decoder_state = BUS_IDLE;
                 resetStates();
@@ -336,52 +340,73 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
             break;
 
         case OVERLOAD_FRAME:
-            if(count_overload_0 == 4) {
+
+            flag_erro = 0;
+            if(count_overload_0 == 5) {
+                // printer->println("6 bits overload");
                 //diz ao encoder para escrever 6 bits dominantes
             }
 
             if(count_overload_1 == 7) {   //espera ler 8 bits um do barramento
                 decoder_state = WAIT;
-                 mount_frame = 1;
+                // printer->println("Saindo do overload");
+                mount_frame = 1;
+                flag_erro = 0;
+                send_flag = 0;
+                resetFlagCntEncoder = 1;
                 // aux = -1;
             }
 
-            if(bit_atual == 1) {
+            if((count_overload_0 >= 5) && (bit_atual == 1)) {
                 count_overload_1++;
-            } else {
+            }
+            else if(bit_atual == 0 && cnt_bit_0 < 5) {
                 count_overload_0++;
             }
             break;
         
         case ERROR:
+      
             flag_erro = 0;
+
             // escreve 6 bits 0 e depois 8 bits 1, não se importa com a leitura
             //após a transmissão de 6 bits 1 o encoder envia bits 1 e espera a leitura deles
             if(count_error_0 == 5){
-                printer->println("6 bits 0 recebidos no estado erro do decoder");
+                // printer->println("6 bits 0 recebidos no estado erro do decoder");
             }
 
             if(count_error_1 == 7) {  //após a transmissão de 1 bit recessivo, ele conta mais 7 bits recessivos
-                printer->println("8 bits 1 recebidos no estado erro do decoder");
+                // printer->println("8 bits 1 recebidos no estado erro do decoder");
                 decoder_state = WAIT;   //após o frame de erro, pode vir frames de overload
+                // printer->println("Flag de mount frame setada.");
                 mount_frame = 1;
-                // aux = -1;
+                flag_erro = 0;
+                send_flag = 0;
+                resetFlagCntEncoder = 1;
             }
-            if(bit_atual == 1) count_error_1++;
-            else count_error_0++;
+            
+            
+            
+            if((count_error_0 >= 5) && (bit_atual == 1)) {
+                count_error_1++;
+            }
+            if(bit_atual == 0 && count_error_0 <= 5) {
+                count_error_0++;
+            }
 
             break;
 
         case WAIT:
-            //precisamos esperar 11 bits recessivos para saber que o barramento está em idle 
+            
             //Esse estado sempre vem do erro ou do overload, logo 8 bits recessivos foram contados anteriormente
             //Precisamos contar apenas mais 3 bits recessivos para o barramento ficar em idle
             //Caso percebamos um bit 0 após os 8 bits recessivos, isso significa que é um overload frame
             flag_erro = 0;
             mount_frame = 0;
-            if(count_bus_idle == 10) {
+            if(count_bus_idle == 2) {
+                mount_frame = 0;
                 decoder_state = BUS_IDLE;
-                printer->println("Saindo do WAIT");
+                // printer->println("Saindo do WAIT");
                 resetStates();
                 flag_erro = 0;
                 resetFlagCntEncoder = 1;
@@ -399,7 +424,23 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
             if(bit_atual == 0) decoder_state = OVERLOAD_FRAME; 
 
             break;
-            
+        
+        case WAIT_INIT:
+            //precisamos esperar 11 bits recessivos para saber que o barramento está em idle 
+            flag_erro = 0;
+            mount_frame = 0;
+            if(count_bus_idle == 10) {
+                mount_frame = 0;
+                decoder_state = BUS_IDLE;
+                // printer->println("Saindo do WAIT INIT");
+                resetStates();
+                flag_erro = 0;
+                resetFlagCntEncoder = 1;
+                send_flag = 1; //Habilita o encoder a enviar mensagens
+                
+                                    
+            }
+            count_bus_idle++;            
     }
 }
 
@@ -411,6 +452,12 @@ void decoder::printData(){
         printer->print(RTR);
         printer->print(" - IDE: ");
         printer->print(IDE);
+
+        if(IDE == 1) {
+            printer->print(" - ID_B: ");
+            printer->print(ID_B, HEX);
+        }
+
         printer->print(" - DLC: ");
         printer->print(DLC);
         printer->print(" - Data: ");
@@ -444,10 +491,11 @@ void decoder::check_bit_stuffing(uint8_t bit_atual) {
             }
 
             if(cnt_bit_1 == 6) {
-                // printer->println("Bit stuff 1 error");
+                printer->println("Bit stuff 1 error");
                 decoder_state = ERROR;
                 err_permission = 0;
                 flag_erro = 1;
+                send_flag = 1;
             }
 
         } else {
@@ -462,10 +510,11 @@ void decoder::check_bit_stuffing(uint8_t bit_atual) {
             }
 
             if(cnt_bit_0 == 6) {
-                // printer->println("Bit stuff 0 error");
+                printer->println("Bit stuff 0 error");
                 decoder_state = ERROR;
                 err_permission = 0;
                 flag_erro = 1;
+                send_flag = 1;
             }
 
         } else {
@@ -477,8 +526,6 @@ void decoder::check_bit_stuffing(uint8_t bit_atual) {
 void decoder::resetStates() {
 
     // crc_str = "";
-
-    notPrinted = 1;
     
     mount_frame = 0;
 
@@ -564,4 +611,14 @@ uint8_t decoder::getResetFlag(){
 
 uint8_t decoder::getMountFrame(){
     return mount_frame;
+}
+
+void decoder::checkBit(uint8_t bit_atual, uint8_t bit_enviado){
+    if(decoder_state != ARBITRATION && decoder_state != CTRL_F && decoder_state != CTRL_EXTENDED_F){
+        if(bit_atual != bit_enviado){
+            printer->println("Erro de bit enviado");
+            decoder_state = ERROR;
+        }
+
+    }
 }

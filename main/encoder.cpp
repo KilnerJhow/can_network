@@ -2,6 +2,11 @@
 
 encoder::encoder(/*uint8_t &flag_err,*/HardwareSerial* print){
 	printer = print;
+	for(int i = 0; i < 14; i++){
+		if(i < 6) enc_frame_err[i] = 0;
+		else enc_frame_err[i] = 1;
+	}
+
 	// this->erro_flag = &flag_err;
 	resetStates();
 
@@ -11,11 +16,17 @@ encoder::encoder(/*uint8_t &flag_err,*/HardwareSerial* print){
 
 void encoder::initialize(){
 	printer->println("Encoder inicializado");
+	// for(int i = 0; i < 14; i++){
+	// 	printer->print(enc_frame_err[i]);
+	// }
+	// printer->println();
 }
 
 void encoder::resetStates() {
+	
 	sendFlag = 0;
 	cnt_envio = 0;
+	cnt_err_envio = 0;
 	enc_state = SOF;
 	enc_cnt = 0;
 	encstuff_cnt = 0;
@@ -38,7 +49,7 @@ void encoder::resetStates() {
 }
 
 void encoder::encoder_mws(int cnt = 0){
-	if(erro_flag == 1){
+	/*if(erro_flag == 1){
 		// printer->println("Entrando no estado de erro no encoder");
 		enc_state = ERRO;
 		erro_flag = 0;
@@ -46,14 +57,14 @@ void encoder::encoder_mws(int cnt = 0){
 		encstuff_cnt = 0;
 		cnt = 0;
 		frame_build = 0;
-	}
+	} 
 	if(over_flag == 1){
 		enc_state = OVER;
 		over_flag = 0;
 		enc_cnt = 0;
 		encstuff_cnt = 0;
 		cnt = 0;
-	}
+	}*/
 	while(frame_build == 0){
 		// cout << "Encoder while " << endl;
 		
@@ -75,6 +86,7 @@ void encoder::encoder_mws(int cnt = 0){
 			case ID:
 				
 				if(cnt >= 0){
+
 					enc_frame[enc_cnt] = bitRead(buf_id_1, cnt);
 					enc_stuffframe[encstuff_cnt] = bitRead(buf_id_1, cnt);
 					calculate_crc();
@@ -82,24 +94,23 @@ void encoder::encoder_mws(int cnt = 0){
 					enc_cnt++;
 					encstuff_cnt++;
 					cnt--;
-				} else {
-					// printer->print("Frame no fim do id: ");
-					// printer->print("\t\t");
-					// for(int i = 0; i < enc_cnt; i++){
-					// 	printer->print(enc_stuffframe[i]);
-					// }
-					// printer->println();
 
+				} else {
 					cnt = 0;
 
 					if(ide == 1){
+						
+						printer->println("IDE = 1");
 						enc_frame[enc_cnt] = 1;//seting SRR
+						enc_stuffframe[encstuff_cnt] = 1;
+
 						calculate_crc();
-						enc_stuffframe[encstuff_cnt]= 1;
 						bit_stuf();
+						
 						enc_cnt++;
 						encstuff_cnt++;
 						enc_state = IDE;
+
 					}else{
 						enc_state = RTR;
 					}
@@ -108,29 +119,48 @@ void encoder::encoder_mws(int cnt = 0){
 				break;
 			
 			case ID2:
-			
+				// printer->println("ID2");
 				if(cnt >= 0){
 					enc_frame[enc_cnt] = bitRead(buf_id_2, cnt);
-					calculate_crc();
 					enc_stuffframe[encstuff_cnt] = bitRead(buf_id_2, cnt);
+					
+					for(int i = 0; i < encstuff_cnt; i++){
+						printer->print(enc_stuffframe[i]);
+					}
+					printer->println();	
 					bit_stuf();
+					calculate_crc();
+
 					enc_cnt++;
 					encstuff_cnt++;
 					cnt--;
-				}else{
+
+				} else {
+
+					// printer->println("Frame no fim do ID2");
+					// printFrameStuff();
 					cnt = 0;
-					enc_state=RTR;
+					enc_state = RTR;
+
+					printer->print("Frame no fim do ID2: ");
+					// printer->print("\t\t");
+					for(int i = 0; i < encstuff_cnt; i++){
+						printer->print(enc_stuffframe[i]);
+					}
+					printer->println();
+
 				}
 				
 				break;
 			
 			case RTR:
+			
 				if(rtr == 0){
 					enc_frame[enc_cnt] = 0;
+					enc_stuffframe[encstuff_cnt] = 0; 
 					calculate_crc();
-					enc_stuffframe[encstuff_cnt] = 0;
 					bit_stuf();
-				}else{
+				} else {
 					enc_frame[enc_cnt] = 1;
 					calculate_crc();
 					enc_stuffframe[encstuff_cnt] = 1;
@@ -160,19 +190,20 @@ void encoder::encoder_mws(int cnt = 0){
 				bit_stuf();
 				enc_cnt++;
 				encstuff_cnt++;
+				
 				if(ide == 0){
+				
 					enc_state = CONTROL_RESBIT;
+
 				}else{
+				
+					printer->println("INDO AO ID2");
 					enc_state = ID2;
 					cnt = 17;	
+
 				}
 
-				// printer->print("Frame no fim do ide: ");
-				// printer->print("\t\t");
-				// for(int i = 0; i < enc_cnt; i++){
-				// 	printer->print(enc_stuffframe[i]);
-				// }
-				// printer->println();
+				break;
 			
 			case CONTROL_RESBIT:
 				if(ide == 0){
@@ -385,12 +416,6 @@ void encoder::setErrorFlag(uint8_t flag_err){
 	if(flag_err) {
 		erro_flag = 1;
 		printer->println("Encoder flag de erro setada");
-		encoder_mws(0);
-		cnt_envio = 0;
-		frame_build = 0;
-		printer->println("Frame de erro montado");
-		printFrameStuff();
-		printer->println("Frame de erro montado");
 	} 
 }
 
@@ -402,23 +427,23 @@ void encoder::setMountFrame(uint8_t flag){
 		enc_state = SOF;
 		resetStates();
 		encoder_mws(0);
-		printer->println("Frame montado: ");
-		printFrameStuff();
+		// printer->println("Frame montado: ");
+		// printFrameStuff();
 		// printer->println();
 		
 	}
 }
 
 void encoder::printFrameNoStuff(){
-	// printer->println("Frame: ");
-	// for(int i = 0; i < save_enc_cnt; i++){
-	// 	printer->print(enc_frame[i]);
-	// }
-	// printer->println();
+	printer->println("Frame: ");
+	for(int i = 0; i < save_enc_cnt; i++){
+		printer->print(enc_frame[i]);
+	}
+	printer->println();
 }
 
 void encoder::printFrameStuff(){
-	// printer->println("Frame: ");
+	printer->println("Frame Stuff: ");
 	for(int i = 0; i < save_encstuff_cnt; i++){
 		printer->print(enc_stuffframe[i]);
 	}
@@ -436,8 +461,15 @@ void encoder::calculate_crc() {
 }
 
 uint8_t encoder::enviaBit() {
-	if(cnt_envio < save_encstuff_cnt) {
-		uint8_t a = enc_stuffframe[cnt_envio];
+	uint8_t a;
+	if(erro_flag && cnt_err_envio < 14){
+		a = enc_frame_err[cnt_err_envio];
+		// printer-
+		// printer->println(a);
+		cnt_err_envio++;
+		return a;
+	} else if(cnt_envio < save_encstuff_cnt && !erro_flag) {
+		a = enc_stuffframe[cnt_envio];
 		// uint8_t a = enc_frame[cnt_envio];
 		cnt_envio++;
 		return a;
@@ -455,14 +487,18 @@ void encoder::bit_stuf(){
 	if( (enc_state != ACK) && (enc_state!=END) && (enc_state!=CRC_D) ){
 		
 		if(enc_stuffframe[encstuff_cnt] == 1) {
-	            cnt_bit_1++;
-	
+			cnt_bit_1++;
 
-	            if(cnt_bit_1 == 5) {
-	                encstuff_cnt++;
-	                enc_stuffframe[encstuff_cnt]=0;
-					cnt_bit_1 = 0;
-	            }
+			printer->print("CNT bit 1: ");
+			printer->println(cnt_bit_1);
+					
+
+			if(cnt_bit_1 == 5) {
+				printer->println("Adicionando 0");
+				encstuff_cnt++;
+				enc_stuffframe[encstuff_cnt] = 0;
+				cnt_bit_1 = 0;
+			}
 
 		} else {
 			cnt_bit_1 = 0;
@@ -470,10 +506,15 @@ void encoder::bit_stuf(){
 
 		if(enc_stuffframe[encstuff_cnt] == 0) {
 			cnt_bit_0++;
-	
+			
+			printer->print("CNT bit 0: ");
+			printer->println(cnt_bit_0);
+
 			if(cnt_bit_0 == 5) {
+				printer->println("Adicionando 1");
 				encstuff_cnt++;
-				enc_stuffframe[encstuff_cnt] =1;
+				enc_stuffframe[encstuff_cnt] = 1;
+				cnt_bit_1++;
 				cnt_bit_0 = 0;
 			} 
 
@@ -507,6 +548,12 @@ void encoder::printDataToSend(){
 	printer->print(rtr);
 	printer->print(" - IDE: ");
 	printer->print(ide);
+
+	if(ide == 1){
+		printer->print(" - ID_B: ");
+		printer->print(buf_id_2, HEX);
+	}
+
 	printer->print(" - DLC: ");
 	printer->print(dlc);
 	printer->print(" - Data: ");
