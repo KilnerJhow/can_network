@@ -69,7 +69,7 @@ void tq_ISR() {
         if(dec.getFlagACK() && !enc.canSendMsg()){
 
             Serial.println("Enviando ACK slot");
-            bit_enviado = 1;
+            bit_enviado = 0;
             writeBus();
 
         } else if(enc.canSendMsg()) {

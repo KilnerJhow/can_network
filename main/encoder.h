@@ -59,9 +59,10 @@ class encoder{
         uint32_t buf_id_2 = 0x3007A;
         uint8_t rtr = 0;
         uint8_t ide = 1;
-        uint8_t dlc = 8;
-        uint8_t buf_dlc = 8;
-        uint64_t buf_data = 0xAAAAAAAAAAAAAAAA; 
+        // uint8_t dlc = 0;
+        uint8_t buf_dlc = 0;
+        // uint64_t buf_data = 0xAAAAAAAAAAAAAAAA; 
+        uint64_t buf_data = 0; 
 
         int enc_frame[150];
         int enc_stuffframe[250];

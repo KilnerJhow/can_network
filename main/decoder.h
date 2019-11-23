@@ -40,6 +40,8 @@ class decoder {
 
         HardwareSerial* printer;
 
+        uint8_t check_ok = 0;
+
         uint8_t notPrinted = 1;
 
         uint8_t mount_frame = 0;
