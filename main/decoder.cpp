@@ -56,11 +56,12 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
             hard_sync = 0;
             if(count_arbitration <= 10) {
                 ID_A = ID_A << 1 | (bit_atual & 1);
-                if(bit_atual != bit_enviado) {
+                
+                if(bit_atual != bit_enviado && win){
                     printer->println("Arbitracao perdida");
-                    send_flag = 0;   //Flag para dizer se o dispositivo perdeu ou não a arbitração
-                                                                //Passada da main para o encoder e o decoder via ponteiro
-                }
+                    send_flag = 0;
+                    win = 0;  
+                } 
                 check_crc(bit_atual);
             }
 
@@ -80,7 +81,10 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
                 // printer->print("Bit 12: ");
                 // printer->println(bit_12);
 
-                if(bit_atual != bit_enviado) send_flag = 0;
+                if(bit_atual != bit_enviado && win){
+                    send_flag = 0;
+                    win = 0;  
+                } 
                 // check_ok = 1;
                 check_crc(bit_atual);
             }
@@ -123,7 +127,10 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
             if(count_ctrl_base_ext <= 17) {    
                 // cout << "Bit lido: " << bit_atual << endl;
                 ID_B = ID_B << 1 | (bit_atual & 1);            
-                if(bit_atual != bit_enviado) send_flag = 0;
+                if(bit_atual != bit_enviado && win){
+                    send_flag = 0;
+                    win = 0;  
+                } 
             }
             
             // if(count_ctrl_base_ext == 17){
@@ -135,7 +142,10 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
                 RTR = bit_atual;
                 // printer->print("RTR: ");
                 // printer->println(RTR);
-                if(bit_atual != bit_enviado) send_flag = 0;
+                if(bit_atual != bit_enviado && win){
+                    send_flag = 0;
+                    win = 0;  
+                } 
             }
 
             if(count_ctrl_base_ext == 20) { //2 bits reservados
@@ -230,7 +240,7 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
             }
 
             if(count_crc == 14) {
-                printer->println();
+                // printer->println();
                 // printer->println(crc_str);
                 // printer->print("CRC check: ");
                 // printer->println(crc_check);
@@ -329,14 +339,14 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
 
             if(count_ifs == 2) {
                 // cout << "Interframe space count: " << count_ifs << endl;
-                printer->println("Intermission");
+                // printer->println("Intermission");
                 // printer->println("Indo para o BUS IDLE");
                 
                 decoder_state = BUS_IDLE;
                 resetStates();
                 err_permission = 0;
                 resetFlagCntEncoder = 1;
-                
+
                 // printer->println("Frame recebido/enviado");
 
                 // printer->print("CNT bit 0 no intermission: ");
@@ -459,7 +469,8 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
 
 void decoder::printData(){
     if(decoder_state == INTERMISSION && notPrinted) {
-        printer->print("\nID_A: ");
+        printer->println("\nRecebido: ");
+        printer->print("ID_A: ");
         printer->print(ID_A, HEX);
         printer->print(" - RTR: ");
         printer->print(RTR);
@@ -474,10 +485,14 @@ void decoder::printData(){
         printer->print(" - DLC: ");
         printer->print(DLC);
         printer->print(" - Data: ");
-        for(int i = 0; i < cnt_field; i++) {
-            printer->print(buf_data[i], HEX);
+        if(RTR == 0){
+            for(int i = 0; i < cnt_field; i++) {
+                printer->print(buf_data[i], HEX);
+            }
+            printer->println();
+        } else {
+            printer->println("Vazio");
         }
-        printer->println();
         notPrinted = 0;
     }
 
@@ -540,6 +555,8 @@ void decoder::resetStates() {
 
     // crc_str = "";
     
+    win = 1;
+
     check_ok = 0;
 
     mount_frame = 0;

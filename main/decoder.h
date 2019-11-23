@@ -40,6 +40,8 @@ class decoder {
 
         HardwareSerial* printer;
 
+        uint8_t win = 1;//1 - ganhou, 0 - perdeu
+
         uint8_t check_ok = 0;
 
         uint8_t notPrinted = 1;

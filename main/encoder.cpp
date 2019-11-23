@@ -553,6 +553,7 @@ void encoder::printDataToSend(){
 	// int buf_data[15];
 	uint8_t a = 0;
 	int aux_cnt = 0;
+	printer->println("Para enviar: ");
 	printer->print("ID_A: ");
 	printer->print(buf_id_1, HEX);
 	printer->print(" - RTR: ");
@@ -567,15 +568,19 @@ void encoder::printDataToSend(){
 
 	printer->print(" - DLC: ");
 	printer->print(buf_dlc);
-	printer->print(" - Data: ");
-	for(int i = buf_dlc*8 - 1; i >= 0 ; i--){
-		a = a << 1 | (bitRead(buf_data, i) & 1);
-		if(aux_cnt == 7) {
-			printer->print(a, HEX);
-			aux_cnt = 0;
+	if(rtr == 0){
+		printer->print(" - Data: ");
+		for(int i = buf_dlc*8 - 1; i >= 0 ; i--){
+			a = a << 1 | (bitRead(buf_data, i) & 1);
+			if(aux_cnt == 7) {
+				printer->print(a, HEX);
+				aux_cnt = 0;
+			}
+			else aux_cnt++;
 		}
-		else aux_cnt++;
+		printer->println("\n");
+	} else {
+		printer->println(" - Data: Vazio\n");
 	}
-	printer->println();
 	
 }
