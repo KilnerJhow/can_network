@@ -49,16 +49,18 @@ class encoder{
         void bit_stuf();
         void resetStates();
         
+        
+
         uint8_t mount_frame = 0;
 
         uint8_t sendFlag;
 
         uint8_t cnt_envio;
         uint8_t cnt_err_envio;
-        uint16_t buf_id_1 = 0x0449; //0x0673
+        uint16_t buf_id_1 = 0x0672; //0x0673
         uint32_t buf_id_2 = 0x3007A;
-        uint8_t rtr = 1;
-        uint8_t ide = 1;
+        uint8_t rtr = 0;
+        uint8_t ide = 0;
         // uint8_t dlc = 0;
         uint8_t buf_dlc = 8;
         uint64_t buf_data = 0xAAAAAAAAAAAAAAAA; 

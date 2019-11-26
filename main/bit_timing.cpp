@@ -46,7 +46,7 @@ void bit_timing::resetStates() {
 
 void bit_timing::hardSync() {
     if(hard_sync == 1) {
-        printer->println("Bit timing hard sync");
+        // printer->println("Bit timing hard sync");
         actual_state = SEG_1;
         resetStates();
         writing_point_ = 1;

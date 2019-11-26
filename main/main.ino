@@ -51,6 +51,7 @@ void setup(){
 void loop() {
     // if(!sender)
         dec.printData();
+        dec.printBitStuff();
 }
 
 void writeBus() {
@@ -68,7 +69,7 @@ void tq_ISR() {
     if(bt.writing_point()) {
         if(dec.getFlagACK() && !enc.canSendMsg()){
 
-            Serial.println("Enviando ACK slot");
+            // Serial.println("Enviando ACK slot");
             bit_enviado = 0;
             writeBus();
 

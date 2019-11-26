@@ -35,10 +35,13 @@ class decoder {
         uint8_t getFlagACK();
         uint8_t getResetFlag();
         uint8_t getMountFrame();
+        void printBitStuff();
 
     private:
 
         HardwareSerial* printer;
+
+        uint8_t print_bit_stuff = 0;
 
         uint8_t win = 1;//1 - ganhou, 0 - perdeu
 
@@ -120,5 +123,4 @@ class decoder {
         void check_bit_stuffing(uint8_t bit_atual);
         void resetStates();
         void checkBit(uint8_t bit_atual, uint8_t bit_enviado);
-
 };

@@ -58,7 +58,7 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
                 ID_A = ID_A << 1 | (bit_atual & 1);
                 
                 if(bit_atual != bit_enviado && win){
-                    printer->println("Arbitracao perdida");
+                    // printer->println("Arbitracao perdida");
                     send_flag = 0;
                     win = 0;  
                 } 
@@ -467,6 +467,13 @@ void decoder::decoder_ms(uint8_t bit_atual, uint8_t bit_enviado) {
     }
 }
 
+void decoder::printBitStuff(){
+    if(print_bit_stuff){
+        printer->println("Erro de bit stuff");
+        print_bit_stuff = 0;
+    }
+}
+
 void decoder::printData(){
     if(decoder_state == INTERMISSION && notPrinted) {
         printer->println("\nRecebido: ");
@@ -519,7 +526,10 @@ void decoder::check_bit_stuffing(uint8_t bit_atual) {
             }
 
             if(cnt_bit_1 == 6) {
-                printer->println("Bit stuff 1 error");
+                
+                print_bit_stuff = 1;
+
+                // printer->println("Bit stuff 1 error");
                 decoder_state = ERROR;
                 err_permission = 0;
                 flag_erro = 1;
@@ -538,7 +548,10 @@ void decoder::check_bit_stuffing(uint8_t bit_atual) {
             }
 
             if(cnt_bit_0 == 6) {
-                printer->println("Bit stuff 0 error");
+
+                print_bit_stuff = 1;
+
+                // printer->println("Bit stuff 0 error");
                 decoder_state = ERROR;
                 err_permission = 0;
                 flag_erro = 1;
@@ -648,7 +661,7 @@ uint8_t decoder::getMountFrame(){
 void decoder::checkBit(uint8_t bit_atual, uint8_t bit_enviado){
     if(check_ok && send_flag){
         if(bit_atual != bit_enviado){
-            printer->println("Erro de bit enviado");
+            // printer->println("Erro de bit enviado");
             decoder_state = ERROR;
             flag_erro = 1;
             send_flag = 1;

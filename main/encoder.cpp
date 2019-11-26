@@ -426,7 +426,7 @@ void encoder::encoder_mws(int cnt = 0){
 void encoder::setErrorFlag(uint8_t flag_err){
 	if(flag_err) {
 		erro_flag = 1;
-		printer->println("Encoder flag de erro setada");
+		// printer->println("Encoder flag de erro setada");
 	} 
 }
 
@@ -494,7 +494,7 @@ uint8_t encoder::canSendMsg() { //Função que retorna se pode ou não enviar me
 }
 
 void encoder::bit_stuf(){
-	
+	/*
 	if( (enc_state != ACK) && (enc_state!=END) && (enc_state!=CRC_D) ){
 		
 		if(enc_stuffframe[encstuff_cnt] == 1) {
@@ -532,7 +532,7 @@ void encoder::bit_stuf(){
 		} else {
 			cnt_bit_0 = 0;
 		}
-	}
+	}*/
 }
 
 void encoder::setSendFlag(uint8_t flag){
