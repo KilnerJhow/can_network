@@ -256,12 +256,6 @@ void encoder::encoder_mws(int cnt = 0){
 					encstuff_cnt++;
 
 				}else{
-					
-					// printer->print("Frame no fim do dlc: ");
-					// for(int i = 0; i < encstuff_cnt; i++){
-					// 	printer->print(enc_stuffframe[i]);
-					// }
-					// printer->println();
 
 					cnt = buf_dlc*8 - 1;
 					enc_state = DATA;
@@ -494,7 +488,7 @@ uint8_t encoder::canSendMsg() { //Função que retorna se pode ou não enviar me
 }
 
 void encoder::bit_stuf(){
-	/*
+
 	if( (enc_state != ACK) && (enc_state!=END) && (enc_state!=CRC_D) ){
 		
 		if(enc_stuffframe[encstuff_cnt] == 1) {
@@ -532,7 +526,7 @@ void encoder::bit_stuf(){
 		} else {
 			cnt_bit_0 = 0;
 		}
-	}*/
+	}
 }
 
 void encoder::setSendFlag(uint8_t flag){
@@ -578,9 +572,9 @@ void encoder::printDataToSend(){
 			}
 			else aux_cnt++;
 		}
-		printer->println("\n");
+		printer->println();
 	} else {
-		printer->println(" - Data: Vazio\n");
+		printer->println(" - Data: Vazio");
 	}
 	
 }

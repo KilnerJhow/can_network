@@ -13,13 +13,18 @@ uint8_t bit_atual = 1;
 bit_timing bt(&Serial);
 decoder dec(&Serial);
 encoder enc(&Serial);
+int change = 0;
 
-uint8_t sender = 1; //trasmissor = 1, receptor = 0
+uint8_t print_bit_enviado = 0; //trasmissor = 1, receptor = 0
+uint8_t flag_print_sendack = 0; //trasmissor = 1, receptor = 0
 
 void setup(){
 
     pinMode(PIN_RX, INPUT);
     pinMode(PIN_TX, OUTPUT);
+    pinMode(13, OUTPUT);
+
+    attachInterrupt(digitalPinToInterrupt(PIN_RX), bt_edge, CHANGE);
 
     digitalWrite(PIN_TX, bit_enviado);
 
@@ -32,26 +37,29 @@ void setup(){
 
 
     enc.encoder_mws(0);
-    enc.printFrameNoStuff();
-    enc.printFrameStuff();
+    enc.printDataToSend();
+    // enc.printFrameNoStuff();
+    // enc.printFrameStuff();
 
     Timer1.attachInterrupt(tq_ISR);
     Timer1.initialize(10000);
-
-    if(sender) {
-        enc.printDataToSend();
-        Serial.println("Configurado no modo transmissor");
-    } else {
-        Serial.println("Configurado no modo receptor");
-    }
-
 
 }
 
 void loop() {
     // if(!sender)
-        dec.printData();
-        dec.printBitStuff();
+    dec.printData();
+    dec.printFlags();
+    bt.printFlag();
+    if(flag_print_sendack){
+        flag_print_sendack =0;
+        Serial.println("Enviando ack");
+    }
+    // if(print_bit_enviado) {
+    //     Serial.print("Enviado: ");
+    //     Serial.println(bit_enviado);
+    //     print_bit_enviado = 0;
+    // }
 }
 
 void writeBus() {
@@ -64,13 +72,15 @@ uint8_t readBus(){
 
 void tq_ISR() {
 
-    bt.machine_state();
+    bt.machine_state(readBus());
     //Se Writing Point = 1
     if(bt.writing_point()) {
+        print_bit_enviado = 1;
         if(dec.getFlagACK() && !enc.canSendMsg()){
 
             // Serial.println("Enviando ACK slot");
             bit_enviado = 0;
+            flag_print_sendack = 1;
             writeBus();
 
         } else if(enc.canSendMsg()) {
@@ -108,4 +118,10 @@ void tq_ISR() {
     }
 
 
+}
+
+void bt_edge(){
+    change = !change;
+    bt.setEdge();
+    digitalWrite(13, change);
 }

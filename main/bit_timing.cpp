@@ -57,13 +57,16 @@ void bit_timing::hardSync() {
 
 void bit_timing::setHS(uint8_t hard_sync){
     this->hard_sync = hard_sync;
+    if(hard_sync)
+        print_hard_sync = 1;
 }
 
-void bit_timing::machine_state() {
+void bit_timing::machine_state(uint8_t bit_atual) {
 
-  checksync(); //verifica a necessidade de sincronização
+    // checkEdge(bit_atual);
+    checksync(); //verifica a necessidade de sincronização
 
-  switch (actual_state) {
+    switch (actual_state) {
         case SYNC:
             if(cnt_sync == 1) {
               actual_state = SEG_1;
@@ -118,7 +121,11 @@ void bit_timing::machine_state() {
     }
 }
 
-/*void bit_timing::checkEdge(){
+void bit_timing::setEdge(){
+    edge = 1;
+}
+
+/*void bit_timing::checkEdge(uint8_t bit_atual){
     // actual = digitalRead(inputpin);
     actual = bit_atual;
 
@@ -127,15 +134,22 @@ void bit_timing::machine_state() {
     } else {
         edge = 0;
     }
-     past = actual;
+    past = actual;
 //    past = bit_atual;
 }*/
+
+void bit_timing::printFlag(){
+    if(print_hard_sync) {
+        printer->println("Bit timing hard sync");
+        print_hard_sync = 0;
+    }
+}
   
 void bit_timing::checksync() {
     if(edge == 1 && actual_state != SYNC){
         edge = 0;
         soft_sync = 1;
-        //resync();
+        resync();
     }
 }
 

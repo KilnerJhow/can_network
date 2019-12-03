@@ -35,19 +35,32 @@ class decoder {
         uint8_t getFlagACK();
         uint8_t getResetFlag();
         uint8_t getMountFrame();
-        void printBitStuff();
+        void printFlags();
 
     private:
 
         HardwareSerial* printer;
 
-        uint8_t print_bit_stuff = 0;
+        uint8_t flag_print_bit_stuff = 0;
+        uint8_t flag_print_win = 0;
+        uint8_t flag_print_err = 0;
+        uint8_t flag_print_err_1 = 0;
+        uint8_t flag_print_err_0 = 0;
+        uint8_t flag_print_err_quit = 0;
+        uint8_t flag_print_eof_err = 0;
+        uint8_t flag_print_ack_err = 0;
+        uint8_t flag_print_ackd = 0;
+        uint8_t flag_print_crcd = 0;
+        uint8_t flag_print_crc = 0;
+        uint8_t flag_print_inter = 0;
+        uint8_t flag_print_data = 0;
+        uint8_t flag_err_occur = 0;
+        uint8_t print_init = 0;
 
         uint8_t win = 1;//1 - ganhou, 0 - perdeu
 
         uint8_t check_ok = 0;
 
-        uint8_t notPrinted = 1;
 
         uint8_t mount_frame = 0;
 
@@ -95,6 +108,7 @@ class decoder {
         uint8_t count_error_0 = 0;
         uint8_t count_end_bits = 0;
         uint8_t count_bus_idle = 0;
+        uint8_t count_wait_init = 0;
 
         uint16_t frame_count;
 

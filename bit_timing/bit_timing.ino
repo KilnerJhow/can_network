@@ -31,6 +31,7 @@ unsigned char actual;
 unsigned char past;
 
 volatile int cnt_sync   = 0;
+volatile int print = 0;
 volatile int cnt_seg_1  = 1;
 volatile int resync1    = 0;
 volatile int cnt_seg_2  = 1;
@@ -205,6 +206,7 @@ void machine_state() {
 }
 
 void tq_ISR() {
+    print = 1;
     aux = !aux;
     checkEdge();    //checa se houve mudanca entre 2 tq
     switch (actual_state) {
